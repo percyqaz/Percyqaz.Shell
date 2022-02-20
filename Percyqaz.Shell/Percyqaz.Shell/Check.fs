@@ -33,7 +33,7 @@ module Check =
                     )
                     [] (List.indexed xs)
             if errors.IsEmpty then Ok() else Error errors
-        | Type.Unit, Val.Unit -> Ok()
+        | Type.Null, Val.Null -> Ok()
         | Type.Closure, Val.Closure _ -> Ok()
         | _ -> Error [sprintf "Expected a %O, got %O" t v]
 

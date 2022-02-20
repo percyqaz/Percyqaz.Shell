@@ -9,19 +9,19 @@ module Parser =
     let private cmdparser, cmdparserRef = createParserForwardedToRef<CommandRequestEx, unit>()
     let private exparser, exparserRef = createParserForwardedToRef<Expr, unit>()
 
-    let valueParser = 
-        let vparser, vparserRef = createParserForwardedToRef<ValEx, unit>()
+    let private valueExprParser = 
+        let vparser, vparserRef = createParserForwardedToRef<Expr, unit>()
 
-        let jtrue  = stringReturn "Y" (ValEx.Bool true)
-        let jfalse = stringReturn "N" (ValEx.Bool false)
-        let jnull = stringReturn "()" ValEx.Unit
+        let jtrue  = stringReturn "true" (Expr.Bool true)
+        let jfalse = stringReturn "false" (Expr.Bool false)
+        let jnull = stringReturn "null" Expr.Null
         let jnumber = 
             (many1Satisfy isDigit) .>>. opt (pchar '.' >>. many1Satisfy isDigit)
             |>> function
                 | (pre, Some post) -> pre + "." + post
                 | (pre, None) -> pre
             |>> System.Double.TryParse
-            |>> fun (s, v) -> ValEx.Number v
+            |>> fun (s, v) -> Expr.Number v
 
         let str s = pstring s
         let stringLiteral =
@@ -39,14 +39,14 @@ module Parser =
             between (str "\"") (str "\"") (stringsSepBy normalCharSnippet escapedCharSnippet)
 
         let ws = spaces
-        let jstring = stringLiteral |>> ValEx.String
+        let jstring = stringLiteral |>> Expr.String
         let listBetweenStrings sOpen sClose pElement f =
             between (str sOpen) (str sClose) (ws >>. sepBy (pElement .>> ws) (str "," >>. ws) |>> f)
-        let jlist = listBetweenStrings "[" "]" exparser ValEx.Array
+        let jlist = listBetweenStrings "[" "]" exparser Expr.Array
         let keyValue = (stringLiteral <|> ident) .>>. (ws >>. str ":" >>. ws >>. exparser)
-        let jobject = listBetweenStrings "{" "}" keyValue (Map.ofList >> ValEx.Object)
+        let jobject = listBetweenStrings "{" "}" keyValue (Map.ofList >> Expr.Object)
 
-        let closure = pchar '@' >>. exparser |>> ValEx.Closure
+        let closure = pchar '@' >>. exparser |>> Expr.Closure
 
         do vparserRef := choiceL [jobject; jlist; closure; jstring; jnumber; jtrue; jfalse; jnull] "Value"
 
@@ -61,7 +61,7 @@ module Parser =
         let var = pchar '$' >>. ident |>> Expr.Variable
         let pipe_input = pchar '$' >>% Expr.Piped_Input
         let command = between (pchar '(') (pchar ')') cmdparser |>> Expr.Evaluate_Command
-        let value = valueParser |>> Expr.Val
+        let value = valueExprParser
         // try catch
         let ternary =
             tuple3 
@@ -100,7 +100,7 @@ module Parser =
             tuple2
                 (pchar '-' >>. ident)
                 (opt (attempt (spaces >>. pchar '=' >>. spaces >>. exprParser)))
-            |>> fun (f, v) -> Flag (f, Option.defaultValue (Expr.Val (ValEx.Bool true)) v)
+            |>> fun (f, v) -> Flag (f, Option.defaultValue (Expr.Bool true) v)
 
         let arg = exprParser |>> Arg
 

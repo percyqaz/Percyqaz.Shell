@@ -1,3 +1,3 @@
 ﻿open Percyqaz.Shell.Library
 
-Context.Empty.Mainloop()
+//Context.Empty.Mainloop()

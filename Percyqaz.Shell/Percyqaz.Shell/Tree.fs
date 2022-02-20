@@ -11,7 +11,7 @@ module Tree =
         | String of string
         | Number of float
         | Bool of bool
-        | Unit
+        | Null
         | Object of Map<string, Val>
         | Array of Val list
         | Closure of CommandRequest
@@ -30,28 +30,24 @@ module Tree =
                 "[ " + 
                 ( xs |> List.map (sprintf "%O") |> String.concat ", " )
                 + " ]"
-            | Unit -> "()"
+            | Null -> "null"
             | Closure req -> "<Closure @0x5E1B008>"
-        
-    /// Value expressions. This is separate from Expr for ease of reading
-    /// This represents a value before resolution, which means objects, arrays, etc can contain expressions that need resolution to values
-    and [<RequireQualifiedAccess>] ValEx =
+
+    /// Expression representations. These are evaluated to Vals during resolution
+    and [<RequireQualifiedAccess>] Expr =
         | String of string
         | Number of float
         | Bool of bool
-        | Unit
+        | Null
         | Object of Map<string, Expr>
         | Array of Expr list
         | Closure of Expr
 
-    /// Expression representations. These are evaluated to Vals during resolution
-    and [<RequireQualifiedAccess>] Expr =
         | Piped_Input
         | Variable of string
         | Subscript of main: Expr * sub: Expr
         | Property of main: Expr * prop: string
         | Evaluate_Command of CommandRequestEx
-        | Val of ValEx
         | Cond of condition: Expr * iftrue: Expr * iffalse: Expr
         | Try of Expr * iferror: Expr
     
@@ -83,7 +79,7 @@ module Tree =
         | Number
         | Object of Map<string, Type>
         | Array of Type
-        | Unit
+        | Null
         | Closure // in future can have a whole function signature
         override this.ToString() =
             match this with
@@ -98,7 +94,7 @@ module Tree =
                 |> String.concat ", " )
                 + " }"
             | Array ty -> sprintf "%O[]" ty
-            | Unit -> "Unit"
+            | Null -> "Null"
             | Closure -> "Closure"
 
     /// Signature for a command, specifying what arguments and flags it takes
@@ -113,15 +109,13 @@ module Tree =
         {
             Args: Val list
             Flags: Map<string, Val>
-            Input: IO.TextReader
-            Output: IO.TextWriter
         }
 
     type Command =
         {
             Name: string
             Signature: CommandSignature
-            Implementation: CommandRequest -> Val
+            Implementation: CommandExecutionContext -> Val
         }
         
     [<RequireQualifiedAccess>]
