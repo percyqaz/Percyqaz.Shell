@@ -1,0 +1,10 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/Percyqaz.Shell/.vs/Percyqaz.Shell
+/Percyqaz.Shell/Percyqaz.Shell/bin/Debug/netstandard2.1
+/Percyqaz.Shell/Percyqaz.Shell/obj
+/Percyqaz.Shell/Percyqaz.Shell.Demo/bin/Debug/net6.0
+/Percyqaz.Shell/Percyqaz.Shell.Demo/obj

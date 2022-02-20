@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Percyqaz.Shell", "Percyqaz.Shell\Percyqaz.Shell.fsproj", "{14192A6D-05C5-4732-AF9A-8BFF9620A17A}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Percyqaz.Shell.Examples", "Percyqaz.Shell.Demo\Percyqaz.Shell.Examples.fsproj", "{C3399B15-D5AA-4383-B04F-13EBED182C3B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{14192A6D-05C5-4732-AF9A-8BFF9620A17A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{14192A6D-05C5-4732-AF9A-8BFF9620A17A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{14192A6D-05C5-4732-AF9A-8BFF9620A17A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{14192A6D-05C5-4732-AF9A-8BFF9620A17A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3399B15-D5AA-4383-B04F-13EBED182C3B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3399B15-D5AA-4383-B04F-13EBED182C3B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3399B15-D5AA-4383-B04F-13EBED182C3B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3399B15-D5AA-4383-B04F-13EBED182C3B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {342809EA-BAE9-48F9-8A78-08030B0F28F3}
+	EndGlobalSection
+EndGlobal
