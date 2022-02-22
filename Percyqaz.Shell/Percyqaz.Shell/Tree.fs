@@ -103,6 +103,7 @@ module Tree =
             Args: (string * Type) list
             OptArgs: (string * Type * Val) list
             Flags: Map<string, Type * Val>
+            ReturnType: Type
         }
 
     type CommandExecutionContext =
@@ -111,17 +112,40 @@ module Tree =
             Flags: Map<string, Val>
         }
 
-    type Command =
+    type CommandInfo =
         {
-            Name: string
             Signature: CommandSignature
             Implementation: CommandExecutionContext -> Val
         }
-        
-    [<RequireQualifiedAccess>]
-    type Err =
-        | NotFound of string
-        | Mismatch of string list
-        | Unhandled of Exception
-
-    type ReqResult = Result<Val, Err>
+    
+    type Context =
+        {
+            Variables: Map<string, Val>
+            Commands: Map<string, CommandInfo>
+        }
+        static member Empty =
+            {
+                Variables = Map.empty
+                Commands = 
+                    Map.ofList [
+                        "echo", {
+                            Signature = {
+                                Args = ["input", Type.Any]
+                                OptArgs = []
+                                Flags = Map.empty
+                                ReturnType = Type.Null
+                            }
+                            Implementation = fun cec -> printfn "%O" cec.Args.[0]; Val.Null
+                        }
+                        
+                        "echo_str", {
+                            Signature = {
+                                Args = ["input", Type.String]
+                                OptArgs = []
+                                Flags = Map.empty
+                                ReturnType = Type.Null
+                            }
+                            Implementation = fun cec -> printfn "%O" cec.Args.[0]; Val.Null
+                        }
+                    ]
+            }
