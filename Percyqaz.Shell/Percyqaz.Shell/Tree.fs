@@ -4,6 +4,35 @@ open System
 
 module Tree =
 
+    /// Types. These are constraints on Values to ensure a command is getting only the kind of data it expects
+    /// For example, a command that opens a file would only want to take Strings since a file name cannot be an Array
+    /// These types are checked before dispatch to prevent such logic errors
+    [<RequireQualifiedAccess>]
+    type Type =
+        | Any
+        | String
+        | Bool
+        | Number
+        | Object of Map<string, Type>
+        | Array of Type
+        | Null
+        | Closure // in future can have a whole function signature
+        override this.ToString() =
+            match this with
+            | Any -> "Any"
+            | String -> "String"
+            | Bool -> "Bool"
+            | Number -> "Number"
+            | Object ms -> 
+                "{ " + 
+                ( Map.toSeq ms
+                |> Seq.map (fun (prop, ty) -> sprintf "%s: %O" prop ty)
+                |> String.concat "; " )
+                + " }"
+            | Array ty -> sprintf "%O[]" ty
+            | Null -> "Null"
+            | Closure -> "Closure"
+
     /// Values. These are the key building block of the shell
     /// All data is represented by these values
     [<RequireQualifiedAccess>]
@@ -23,7 +52,7 @@ module Tree =
             | Object ms -> 
                 "{ " + 
                 ( Map.toSeq ms
-                |> Seq.map (fun (prop, v) -> sprintf "%s = %O" prop v)
+                |> Seq.map (fun (prop, v) -> sprintf "%s: %O" prop v)
                 |> String.concat ", " )
                 + " }"
             | Array xs ->
@@ -50,6 +79,10 @@ module Tree =
         | Evaluate_Command of CommandRequestEx
         | Cond of condition: Expr * iftrue: Expr * iffalse: Expr
         | Try of Expr * iferror: Expr
+
+    and [<RequireQualifiedAccess>] Statement =
+        | Declare of string * Type option * Expr
+        | Command of CommandRequestEx
     
     /// A resolved command request, ready for check + dispatch
     and CommandRequest =
@@ -67,35 +100,6 @@ module Tree =
             Args: Expr list
             Flags: Map<string, Expr>
         }
-    
-    /// Types. These are constraints on Values to ensure a command is getting only the kind of data it expects
-    /// For example, a command that opens a file would only want to take Strings since a file name cannot be an Array
-    /// These types are checked before dispatch to prevent such logic errors
-    [<RequireQualifiedAccess>]
-    type Type =
-        | Any
-        | String
-        | Bool
-        | Number
-        | Object of Map<string, Type>
-        | Array of Type
-        | Null
-        | Closure // in future can have a whole function signature
-        override this.ToString() =
-            match this with
-            | Any -> "Any"
-            | String -> "String"
-            | Bool -> "Bool"
-            | Number -> "Number"
-            | Object ms -> 
-                "{ " + 
-                ( Map.toSeq ms
-                |> Seq.map (fun (prop, ty) -> sprintf "%s: %O" prop ty)
-                |> String.concat ", " )
-                + " }"
-            | Array ty -> sprintf "%O[]" ty
-            | Null -> "Null"
-            | Closure -> "Closure"
 
     /// Signature for a command, specifying what arguments and flags it takes
     type CommandSignature =
@@ -120,7 +124,7 @@ module Tree =
     
     type Context =
         {
-            Variables: Map<string, Val>
+            Variables: Map<string, Type * Val>
             Commands: Map<string, CommandInfo>
         }
         static member Empty =

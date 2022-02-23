@@ -118,3 +118,16 @@ module Parser =
                 }
 
         cmdparser
+
+    let stmtParser =
+        
+        let decl =
+            tuple3
+                (pstring "let" >>. spaces1 >>. ident .>> spaces)
+                (preturn None) // type sig stuff
+                (pstring "=" >>. spaces >>. exparser)
+            |>> Statement.Declare
+
+        let command = commandParser |>> Statement.Command
+
+        choiceL [decl; command] "Statement"
