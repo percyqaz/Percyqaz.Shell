@@ -10,6 +10,7 @@
     <Compile Include="Parser.fs" />
     <Compile Include="Check.fs" />
     <Compile Include="Library.fs" />
+    <Compile Include="Helpers.fs" />
   </ItemGroup>
 
   <ItemGroup>

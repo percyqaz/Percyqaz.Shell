@@ -7,13 +7,11 @@ module Library =
     open Tree
     open FParsec
 
-    [<RequireQualifiedAccess>]
-    type CmdErr =
-    | ParseFailure of string
-    | TypeFailure of Check.Res
-    | RuntimeException of Exception
-
-    type CommandResult = Result<Val, CmdErr>
+    type ShellResult<'T> =
+        | Ok of 'T
+        | ParseFail of string
+        | TypeFail of Check.TypeError list
+        | RunFail of Exception
 
     module Context =
 
@@ -28,11 +26,7 @@ module Library =
                         | Result.Ok t -> t
                         | Result.Error xs -> failwithf "Could not infer type for variable %s: %A" name xs
                 { ctx with Variables = Map.add name (vtype, eval_expr expr ctx) ctx.Variables }
-            | Statement.Command rx ->
-                let req = resolve rx ctx
-                match dispatch req ctx with
-                | Result.Ok _ -> ctx // discard the output value
-                | Result.Error err -> failwith "Error dispatching command"
+            | Statement.Command rx -> dispatch rx ctx |> ignore; ctx
 
         and eval_expr (ex: Expr) (ctx: Context) : Val =
             match ex with
@@ -73,64 +67,67 @@ module Library =
                     else failwithf "Object has no such property '%s'" prop
                 | _ -> failwith "This value is not an object"
             | Expr.Evaluate_Command (rx: CommandRequestEx) ->
-                let req = resolve rx ctx
-                match dispatch req ctx with
-                | Result.Ok v -> v
-                | Result.Error err -> failwith "Error dispatching subcommand" // needs more info
+                dispatch rx ctx // todo: wrap exception that is thrown
             | Expr.Cond (cond, iftrue, iffalse) ->
                 let c = eval_expr cond ctx
                 if (match c with Val.Bool b -> b | _ -> failwith "Condition must be a boolean") then // truthiness nyi
                     eval_expr iftrue ctx
                 else eval_expr iffalse ctx
-            | Expr.Try (ex, iferror) -> failwith "nyi needs some infrastructure"
+            | Expr.Try (ex, iferror) -> failwith "nyi"
 
-        and resolve (req: CommandRequestEx) (ctx: Context) : CommandRequest =
-            {
-                Name = req.Name
-                Args = req.Args |> List.map (fun ex -> eval_expr ex ctx)
-                Flags = req.Flags |> Map.map (fun _ ex -> eval_expr ex ctx)
-            }
-
-        and dispatch (req: CommandRequest) (ctx: Context) : CommandResult =
+        and dispatch (req: CommandRequestEx) (ctx: Context) : Val =
+            let resolved_request : CommandRequest =
+                {
+                    Name = req.Name
+                    Args = req.Args |> List.map (fun ex -> eval_expr ex ctx)
+                    Flags = req.Flags |> Map.map (fun _ ex -> eval_expr ex ctx)
+                }
             let cmd = ctx.Commands.[req.Name]
-            try cmd.Implementation { Args = req.Args; Flags = req.Flags } |> CommandResult.Ok
-            with err -> CommandResult.Error (CmdErr.RuntimeException err)
+            cmd.Implementation { Args = resolved_request.Args; Flags = resolved_request.Flags }
 
     type Context with
-        member this.Execute(command: CommandRequestEx) : CommandResult =
+        member this.Execute(command: CommandRequestEx) : ShellResult<Val> =
             match Check.type_check_reqex Type.Any command this with
             | [] -> 
-                let req = Context.resolve command this
-                Context.dispatch req this
-            | xs -> printfn ""; xs |> List.iter Check.Err.prettyPrint; CommandResult.Error (CmdErr.TypeFailure xs)
+                try Context.dispatch command this |> Ok
+                with err -> RunFail err
+            | xs -> TypeFail xs
                 
-        member this.Execute(command: string) : CommandResult =
+        member this.Execute(command: string) : ShellResult<Val> =
             match run (Parser.commandParser .>> eof) command with
             | Success (res, _, _) -> this.Execute res
-            | Failure (err, _, _) -> printfn "Parse failure: %s" err; CommandResult.Error (CmdErr.ParseFailure err)
+            | Failure (err, _, _) -> ParseFail err
 
-        member this.Evaluate(ex: Expr) = // can throw
+        member this.Evaluate(ex: Expr) : ShellResult<Val> =
             match Check.type_check_expr Type.Any ex this with
-            | [] -> Context.eval_expr ex this
-            | xs -> printfn ""; xs |> List.iter Check.Err.prettyPrint; Val.Null
+            | [] -> 
+                try Context.eval_expr ex this |> Ok
+                with err -> RunFail err
+            | xs -> TypeFail xs
             
-        member this.Evaluate(command: string) : Val =
+        member this.Evaluate(command: string) : ShellResult<Val> =
             match run (Parser.exprParser .>> eof) command with
-            | Success (res, _, _) -> this.Evaluate(res)
-            | Failure (err, _, _) -> printfn "Parse failure: %s" err; Val.Null
+            | Success (res, _, _) -> this.Evaluate res
+            | Failure (err, _, _) -> ParseFail err
 
-        member this.Interpret(stmt: Statement) : Context = // can throw
+        member this.Interpret(stmt: Statement) : ShellResult<Context> =
             match Check.type_check_stmt stmt this with
-            | [] -> Context.do_stmt stmt this
-            | xs -> printfn ""; xs |> List.iter Check.Err.prettyPrint; this
+            | [] -> 
+                try Context.do_stmt stmt this |> Ok
+                with err -> RunFail err
+            | xs -> TypeFail xs
 
-        member this.Interpret(command: string) : Context =
+        member this.Interpret(command: string) : ShellResult<Context> =
             match run (Parser.stmtParser .>> eof) command with
-            | Success (res, _, _) -> this.Interpret(res)
-            | Failure (err, _, _) -> printfn "Parse failure: %s" err; this
+            | Success (res, _, _) -> this.Interpret res
+            | Failure (err, _, _) -> ParseFail err
 
     let mainloop() =
         let mutable ctx = Context.Empty
         while true do 
             printf "> "
-            ctx <- ctx.Interpret(Console.ReadLine())
+            match ctx.Interpret(Console.ReadLine()) with
+            | Ok c -> ctx <- c
+            | ParseFail err -> printfn "%s" err
+            | TypeFail errs -> printfn ""; List.iter (Check.Err.prettyPrint) errs
+            | RunFail exn -> printfn "Runtime failure: %s" exn.Message

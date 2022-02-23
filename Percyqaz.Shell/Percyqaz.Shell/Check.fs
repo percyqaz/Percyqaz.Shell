@@ -5,13 +5,13 @@ module Check =
     open Tree
 
     [<RequireQualifiedAccess>]
-    type ChkErr =
+    type TypeError =
         | Leaf of msg: string
-        | Node of name: string * ChkErr list // list should be nonempty
-    type Res = ChkErr list
+        | Node of name: string * TypeError list // list should be nonempty
+    type Res = TypeError list
 
     module Err =
-        let wrap name e = ChkErr.Node (name, e)
+        let wrap name e = TypeError.Node (name, e)
 
         let pick name errs =
             match errs with
@@ -23,13 +23,13 @@ module Check =
             | [] -> None
             | xs -> Some (wrap (namefunc o) xs)
 
-        let one s = [ChkErr.Leaf s]
+        let one s = [TypeError.Leaf s]
 
         let prettyPrint e =
             let rec loop depth e =
                 match e with
-                | ChkErr.Leaf m -> printfn "%s%s" (String.replicate depth " ") m
-                | ChkErr.Node (name, children) ->
+                | TypeError.Leaf m -> printfn "%s%s" (String.replicate depth " ") m
+                | TypeError.Node (name, children) ->
                     printfn "%s@%s:" (String.replicate depth " ") name
                     for c in children do loop (depth + 1) c
             loop 0 e
@@ -184,7 +184,7 @@ module Check =
                 | [] -> ()
                 | errs -> errors <- Err.wrap (sprintf "Argument '%s'" name) errs :: errors
                 args <- xs
-            | [] -> errors <- ChkErr.Leaf (sprintf "Missing argument '%s': Expected a %O" name ty) :: errors
+            | [] -> errors <- TypeError.Leaf (sprintf "Missing argument '%s': Expected a %O" name ty) :: errors
 
         for (name, ty, _) in cmd.Signature.OptArgs do
             match args with
@@ -196,7 +196,7 @@ module Check =
             | [] -> ()
 
         while args <> [] do
-            errors <- ChkErr.Leaf (sprintf "Unexpected argument %O" (List.head args)) :: errors
+            errors <- TypeError.Leaf (sprintf "Unexpected argument %O" (List.head args)) :: errors
             args <- List.tail args
 
         for KeyValue (name, v) in rx.Flags do
@@ -204,7 +204,7 @@ module Check =
                 match type_check_expr (fst cmd.Signature.Flags.[name]) v ctx with
                 | [] -> ()
                 | errs -> errors <- Err.wrap (sprintf "Flag '%s'" name) errs :: errors
-            else errors <- ChkErr.Leaf (sprintf "Unrecognised flag '%s'" name) :: errors
+            else errors <- TypeError.Leaf (sprintf "Unrecognised flag '%s'" name) :: errors
 
         match type_unify t cmd.Signature.ReturnType with
         | [] -> ()
