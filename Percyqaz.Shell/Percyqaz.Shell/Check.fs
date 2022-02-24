@@ -169,7 +169,7 @@ module Check =
         | Type.Any, _ -> []
         | _, _ -> Err.one (sprintf "Expected a %O but got: %O" t ex)
 
-    and type_check_reqex (t: Type) (rx: CommandRequestEx) (ctx: Context) : Res =
+    and type_check_reqex (t: Type) (rx: CommandRequest) (ctx: Context) : Res =
         match Map.tryFind rx.Name ctx.Commands with
         | None -> Err.one (sprintf "Unrecognised command '%s'" rx.Name)
         | Some cmd ->
@@ -186,7 +186,7 @@ module Check =
                 args <- xs
             | [] -> errors <- TypeError.Leaf (sprintf "Missing argument '%s': Expected a %O" name ty) :: errors
 
-        for (name, ty, _) in cmd.Signature.OptArgs do
+        for (name, ty) in cmd.Signature.OptArgs do
             match args with
             | x :: xs ->
                 match type_check_expr ty x ctx with
@@ -201,7 +201,7 @@ module Check =
 
         for KeyValue (name, v) in rx.Flags do
             if cmd.Signature.Flags.ContainsKey name then
-                match type_check_expr (fst cmd.Signature.Flags.[name]) v ctx with
+                match type_check_expr cmd.Signature.Flags.[name] v ctx with
                 | [] -> ()
                 | errs -> errors <- Err.wrap (sprintf "Flag '%s'" name) errs :: errors
             else errors <- TypeError.Leaf (sprintf "Unrecognised flag '%s'" name) :: errors

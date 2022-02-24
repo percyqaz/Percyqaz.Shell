@@ -43,7 +43,7 @@ module Tree =
         | Null
         | Object of Map<string, Val>
         | Array of Val list
-        | Closure of CommandRequest
+        | Closure of unit
         override this.ToString() =
             match this with
             | String s -> sprintf "%A" s
@@ -76,25 +76,17 @@ module Tree =
         | Variable of string
         | Subscript of main: Expr * sub: Expr
         | Property of main: Expr * prop: string
-        | Evaluate_Command of CommandRequestEx
+        | Evaluate_Command of CommandRequest
         | Cond of condition: Expr * iftrue: Expr * iffalse: Expr
         | Try of Expr * iferror: Expr
 
     and [<RequireQualifiedAccess>] Statement =
         | Declare of string * Type option * Expr
-        | Command of CommandRequestEx
-    
-    /// A resolved command request, ready for check + dispatch
-    and CommandRequest =
-        {
-            Name: string
-            Args: Val list
-            Flags: Map<string, Val>
-        }
+        | Command of CommandRequest
 
     /// An unresolved command request, containing expressions as arguments.
     /// Converted to a CommandRequest via resolution
-    and CommandRequestEx =
+    and CommandRequest =
         {
             Name: string
             Args: Expr list
@@ -105,8 +97,8 @@ module Tree =
     type CommandSignature =
         {
             Args: (string * Type) list
-            OptArgs: (string * Type * Val) list
-            Flags: Map<string, Type * Val>
+            OptArgs: (string * Type) list
+            Flags: Map<string, Type>
             ReturnType: Type
         }
 

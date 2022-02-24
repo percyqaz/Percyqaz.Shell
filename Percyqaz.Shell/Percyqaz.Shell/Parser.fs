@@ -6,7 +6,7 @@ module Parser =
 
     let private ident = identifier (new IdentifierOptions())
 
-    let private cmdparser, cmdparserRef = createParserForwardedToRef<CommandRequestEx, unit>()
+    let private cmdparser, cmdparserRef = createParserForwardedToRef<CommandRequest, unit>()
     let private exparser, exparserRef = createParserForwardedToRef<Expr, unit>()
 
     let private valueExprParser = 

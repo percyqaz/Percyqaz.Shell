@@ -1,3 +1,4 @@
-﻿open Percyqaz.Shell.Library
+﻿open Percyqaz.Shell.Helpers
 
-mainloop()
+//mainloop()
+create<Test>()

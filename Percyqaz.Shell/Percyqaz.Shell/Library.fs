@@ -66,7 +66,7 @@ module Library =
                     if ms.ContainsKey prop then ms.[prop]
                     else failwithf "Object has no such property '%s'" prop
                 | _ -> failwith "This value is not an object"
-            | Expr.Evaluate_Command (rx: CommandRequestEx) ->
+            | Expr.Evaluate_Command (rx: CommandRequest) ->
                 dispatch rx ctx // todo: wrap exception that is thrown
             | Expr.Cond (cond, iftrue, iffalse) ->
                 let c = eval_expr cond ctx
@@ -75,18 +75,16 @@ module Library =
                 else eval_expr iffalse ctx
             | Expr.Try (ex, iferror) -> failwith "nyi"
 
-        and dispatch (req: CommandRequestEx) (ctx: Context) : Val =
-            let resolved_request : CommandRequest =
+        and dispatch (req: CommandRequest) (ctx: Context) : Val =
+            let cmd = ctx.Commands.[req.Name]
+            cmd.Implementation
                 {
-                    Name = req.Name
                     Args = req.Args |> List.map (fun ex -> eval_expr ex ctx)
                     Flags = req.Flags |> Map.map (fun _ ex -> eval_expr ex ctx)
                 }
-            let cmd = ctx.Commands.[req.Name]
-            cmd.Implementation { Args = resolved_request.Args; Flags = resolved_request.Flags }
 
     type Context with
-        member this.Execute(command: CommandRequestEx) : ShellResult<Val> =
+        member this.Execute(command: CommandRequest) : ShellResult<Val> =
             match Check.type_check_reqex Type.Any command this with
             | [] -> 
                 try Context.dispatch command this |> Ok
