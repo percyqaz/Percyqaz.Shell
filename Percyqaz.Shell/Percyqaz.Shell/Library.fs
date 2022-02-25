@@ -84,6 +84,12 @@ module Library =
                 }
 
     type Context with
+        static member Create<'T>() =
+            let mutable ctx = Context.Empty
+            for (name, cmd) in Helpers.createCommands<'T>() do
+                ctx <- ctx.AddCommand(name, cmd)
+            ctx
+
         member this.Execute(command: CommandRequest) : ShellResult<Val> =
             match Check.type_check_reqex Type.Any command this with
             | [] -> 
@@ -120,8 +126,11 @@ module Library =
             | Success (res, _, _) -> this.Interpret res
             | Failure (err, _, _) -> ParseFail err
 
-    let mainloop() =
-        let mutable ctx = Context.Empty
+        member this.AddCommand(name: string, details: CommandInfo) =
+            { this with Commands = Map.add name details this.Commands }
+
+    let mainloop<'T>() =
+        let mutable ctx = Context.Create<'T>()
         while true do 
             printf "> "
             match ctx.Interpret(Console.ReadLine()) with

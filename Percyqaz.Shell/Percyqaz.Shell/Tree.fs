@@ -122,26 +122,5 @@ module Tree =
         static member Empty =
             {
                 Variables = Map.empty
-                Commands = 
-                    Map.ofList [
-                        "echo", {
-                            Signature = {
-                                Args = ["input", Type.Any]
-                                OptArgs = []
-                                Flags = Map.empty
-                                ReturnType = Type.Null
-                            }
-                            Implementation = fun cec -> printfn "%O" cec.Args.[0]; Val.Null
-                        }
-                        
-                        "echo_str", {
-                            Signature = {
-                                Args = ["input", Type.String]
-                                OptArgs = []
-                                Flags = Map.empty
-                                ReturnType = Type.Null
-                            }
-                            Implementation = fun cec -> printfn "%O" cec.Args.[0]; Val.Null
-                        }
-                    ]
+                Commands = Map.empty
             }
