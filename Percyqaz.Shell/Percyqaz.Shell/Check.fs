@@ -11,7 +11,9 @@ module Check =
     type Res = TypeError list
 
     module Err =
-        let wrap name e = TypeError.Node (name, e)
+        let wrap name es = TypeError.Node (name, es)
+
+        let wraps name es = Error [wrap name es]
 
         let pick name errs =
             match errs with
@@ -25,15 +27,20 @@ module Check =
 
         let one s = [TypeError.Leaf s]
 
-        let prettyPrint e =
-            let rec loop depth e =
-                match e with
-                | TypeError.Leaf m -> printfn "%s%s" (String.replicate depth " ") m
-                | TypeError.Node (name, children) ->
-                    printfn "%s@%s:" (String.replicate depth " ") name
-                    for c in children do loop (depth + 1) c
-            loop 0 e
+        let format es : string list =
+            let rec manyLoop depth es output : string list =
+                let rec oneLoop depth e output : string list =
+                    match e with
+                    | TypeError.Leaf m -> sprintf "%s%s" (String.replicate depth " ") m :: output
+                    | TypeError.Node (name, children) ->
+                        sprintf "%s@%s:" (String.replicate depth " ") name :: manyLoop (depth + 1) children output
+                match es with
+                | [] -> output
+                | x :: xs -> oneLoop depth x (manyLoop depth xs output)
+            manyLoop 0 es []
 
+    // actually bad name, checks if current type matches target
+    // unifying will be a different behaviour to join two types
     let rec type_unify (target: Type) (current: Type) : Res =
         match target, current with
         | Type.Any, _ -> []
@@ -91,9 +98,9 @@ module Check =
                 match infer_type sub ctx with
                 | Ok Type.Number -> Ok arrtype
                 | Ok _ -> Error (Err.one "Indicies must be numbers")
-                | Error xs -> Error [(Err.wrap "Subscript index" xs)]
+                | Error xs -> Err.wraps "Subscript index" xs
             | Ok _ -> Error (Err.one "Subscripting a non-array")
-            | Error xs -> Error [(Err.wrap "Subscriptand" xs)]
+            | Error xs -> Err.wraps "Subscriptand" xs
         | Expr.Property (ex, prop) ->
             match infer_type ex ctx with
             | Ok (Type.Object props) ->
@@ -101,12 +108,25 @@ module Check =
                 | Some ptype -> Ok ptype
                 | None -> Error (Err.one (sprintf "Unrecognised property: '%s'" prop))
             | Ok _ -> Error (Err.one "Accessing property of a non-object")
-            | Error xs -> Error [(Err.wrap "Object expression" xs)]
-        | Expr.Evaluate_Command reqex -> Error (Err.one "nyi")
-        | Expr.Cond (cond, iftrue, iffalse) -> Error (Err.one "nyi")
+            | Error xs -> Err.wraps "Object expression" xs
+        | Expr.Evaluate_Command reqex ->
+            match type_check_reqex Type.Any reqex ctx with
+            | [] -> Ok ctx.Commands.[reqex.Name].Signature.ReturnType
+            | xs -> Err.wraps "Command expression" xs
+        | Expr.Cond (cond, iftrue, iffalse) ->
+            match infer_type cond ctx with
+            | Ok Type.Bool ->
+                match infer_type iftrue ctx with
+                | Ok ty ->
+                    match type_check_expr ty iffalse ctx with
+                    | [] -> Ok ty
+                    | xs -> Err.wraps "False arm" xs
+                | Error xs -> Err.wraps "True arm" xs
+            | Ok _ -> Error (Err.one "Condition should be a boolean expression")
+            | Error xs -> Err.wraps "Condition" xs
         | Expr.Try (expr, iferror) -> Error (Err.one "nyi")
 
-    let rec type_check_expr (t: Type) (ex: Expr) (ctx: Context) : Res =
+    and type_check_expr (t: Type) (ex: Expr) (ctx: Context) : Res =
         match t, ex with
         | Type.String, Expr.String _ -> []
         | Type.Number, Expr.Number _ -> []
@@ -218,3 +238,4 @@ module Check =
             type_check_expr (Option.defaultValue Type.Any ty) expr ctx
         | Statement.Command req ->
             type_check_reqex Type.Any req ctx
+        | Statement.Help _ -> []

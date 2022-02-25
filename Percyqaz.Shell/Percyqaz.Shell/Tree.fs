@@ -83,6 +83,7 @@ module Tree =
     and [<RequireQualifiedAccess>] Statement =
         | Declare of string * Type option * Expr
         | Command of CommandRequest
+        | Help of string option
 
     /// An unresolved command request, containing expressions as arguments.
     /// Converted to a CommandRequest via resolution
@@ -102,10 +103,22 @@ module Tree =
             ReturnType: Type
         }
 
+    type IOContext =
+        {
+            In: IO.TextReader
+            Out: IO.TextWriter
+        }
+        static member Default =
+            {
+                In = Console.In
+                Out = Console.Out
+            }
+
     type CommandExecutionContext =
         {
             Args: Val list
             Flags: Map<string, Val>
+            IOContext: IOContext
         }
 
     type CommandInfo =
@@ -118,9 +131,14 @@ module Tree =
         {
             Variables: Map<string, Type * Val>
             Commands: Map<string, CommandInfo>
+            IO: IOContext
         }
         static member Empty =
             {
                 Variables = Map.empty
                 Commands = Map.empty
+                IO = IOContext.Default
             }
+        member this.Write(str: string) = this.IO.Out.Write(str)
+        member this.WriteLine(str: string) = this.IO.Out.WriteLine(str)
+        member this.ReadLine() : string = this.IO.In.ReadLine()

@@ -9,7 +9,7 @@
     <Compile Include="Tree.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="Check.fs" />
-    <Compile Include="Helpers.fs" />
+    <Compile Include="Interop.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
 

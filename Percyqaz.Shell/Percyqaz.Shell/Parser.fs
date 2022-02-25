@@ -121,6 +121,8 @@ module Parser =
 
     let stmtParser =
         
+        let help = (pstring "help" >>. opt (spaces1 >>. ident)) |>> Statement.Help
+
         let decl =
             tuple3
                 (pstring "let" >>. spaces1 >>. ident .>> spaces)
@@ -130,4 +132,4 @@ module Parser =
 
         let command = commandParser |>> Statement.Command
 
-        choiceL [decl; command] "Statement"
+        choiceL [decl; help; command] "Statement"

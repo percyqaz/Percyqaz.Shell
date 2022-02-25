@@ -1,20 +1,9 @@
 ﻿namespace Percyqaz.Shell
 
+open System
 open Tree
 
-module Helpers =
-
-    let echo : CommandInfo =
-        {
-            Signature =
-                {
-                    Args = []
-                    OptArgs = []
-                    Flags = Map.empty
-                    ReturnType = Type.Null
-                }
-            Implementation = Unchecked.defaultof<_>
-        }
+module DotNetInterop =
 
     module Lens =
         
@@ -24,24 +13,37 @@ module Helpers =
         let float = function Val.Number n -> n :> obj | _ -> failwith "lens"
         let unit = function Val.Null -> () :> obj | _ -> failwith "lens"
 
-        let create (ty: System.Type) =
+        let rec create (ty: System.Type) =
             if ty = typeof<string> then string, Type.String
             elif ty = typeof<bool> then boolean, Type.Bool
             elif ty = typeof<int> then integer, Type.Number
             elif ty = typeof<float> then float, Type.Number
             elif ty = typeof<unit> then unit, Type.Null
+            elif ty.IsArray then 
+                let elementType = ty.GetElementType()
+                let lens, etype = create (elementType)
+                let arrLens = 
+                    function
+                    | Val.Array xs ->
+                        let elems = List.map lens xs |> Array.ofList
+                        let typedArray = Array.CreateInstance(elementType, elems.Length)
+                        Array.Copy(elems, typedArray, elems.Length)
+                        typedArray :> obj
+                    | _ -> failwith "lens"
+                arrLens, Type.Array etype
             elif ty = typeof<Val> then (fun x -> x :> obj), Type.Any
             else (fun _ -> null), Type.Null
 
     module Return =
 
-        let fromObj(o: obj) : Val =
+        let rec fromObj(o: obj) : Val =
             match o with
             | :? string as s -> Val.String s
             | :? bool as b -> Val.Bool b
             | :? int as i -> Val.Number (float i)
             | :? float as f -> Val.Number f
             | :? unit -> Val.Null
+            | :? array<obj> as xs -> Array.map fromObj xs |> List.ofArray |> Val.Array
             | :? Val as v -> v
             | _ -> Val.Null
 

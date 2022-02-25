@@ -2,14 +2,20 @@
 open Percyqaz.Shell.Tree
 open System.Runtime.InteropServices
 
-let mutable int = 0
-
 type Test =
 
     static member Add_Default_Five (x: int, [<Optional; DefaultParameterValue(5)>] y: int) = x + y
         
     static member Echo (input: Val) : unit = printfn "%O" input
 
-    static member Increment () : int = int <- int + 1; int
+    static member Sum (xs: int array) = Array.sum xs
 
-mainloop<Test>()
+    static member Host () =
+        printfn "serving"
+        ShellInterface.serve "SHELL-TEST" (Context.Create<Test>())
+        printfn "not serving"
+
+    static member Connect (command: string) =
+        ShellInterface.connect "SHELL-TEST" command
+
+ShellInterface.basic_repl<Test>()
