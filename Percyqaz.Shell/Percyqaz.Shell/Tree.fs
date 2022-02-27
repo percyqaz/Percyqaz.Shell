@@ -16,7 +16,6 @@ module Tree =
         | Object of Map<string, Type>
         | Array of Type
         | Null
-        | Closure // in future can have a whole function signature
         override this.ToString() =
             match this with
             | Any -> "Any"
@@ -31,7 +30,6 @@ module Tree =
                 + " }"
             | Array ty -> sprintf "%O[]" ty
             | Null -> "Null"
-            | Closure -> "Closure"
 
     /// Values. These are the key building block of the shell
     /// All data is represented by these values
@@ -43,7 +41,6 @@ module Tree =
         | Null
         | Object of Map<string, Val>
         | Array of Val list
-        | Closure of unit
         override this.ToString() =
             match this with
             | String s -> sprintf "%A" s
@@ -60,7 +57,6 @@ module Tree =
                 ( xs |> List.map (sprintf "%O") |> String.concat ", " )
                 + " ]"
             | Null -> "null"
-            | Closure req -> "<Closure @0x5E1B008>"
 
     /// Expression representations. These are evaluated to Vals during resolution
     and [<RequireQualifiedAccess>] Expr =
@@ -70,7 +66,6 @@ module Tree =
         | Null
         | Object of Map<string, Expr>
         | Array of Expr list
-        | Closure of Expr
 
         | Piped_Input
         | Variable of string

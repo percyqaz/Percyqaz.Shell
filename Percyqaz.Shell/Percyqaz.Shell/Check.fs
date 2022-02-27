@@ -59,7 +59,6 @@ module Check =
             ) xs
             |> List.ofSeq
         | Type.Array t1, Type.Array t2 -> List.choose id [Err.pick "Array type" (type_unify t1 t2)]
-        | Type.Closure, _ -> Err.one "nyi"
         | _, _ -> Err.one (sprintf "Cannot unify actual type %O with expected type %O" current target)
 
     let rec infer_type (ex: Expr) (ctx: Context) : Result<Type, Res> =
@@ -82,7 +81,6 @@ module Check =
             |> List.ofSeq
             |> function [] -> Ok (Type.Object ts) | xs -> Error xs
         | Expr.Array xs -> Ok (Type.Array (Type.Any)) // nyi
-        | Expr.Closure _ -> Error (Err.one "nyi")
 
         | Expr.Piped_Input ->
             match Map.tryFind "" ctx.Variables with
@@ -148,7 +146,6 @@ module Check =
                     ( fun (i, x) -> sprintf "Item %i" i )
                     ( fun (i, x) -> type_check_expr ty x ctx )
             ) (List.indexed xs)
-        | Type.Closure _, _ -> Err.one "nyi"
         | _, Expr.Piped_Input ->
             match Map.tryFind "" ctx.Variables with
             | Some (ty, _) -> List.choose id [Err.pick "Pipeline variable" (type_unify t ty)]

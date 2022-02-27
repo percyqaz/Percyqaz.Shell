@@ -69,10 +69,6 @@ module Library =
             | Expr.Null -> Val.Null
             | Expr.Object m -> m |> Map.map (fun _ ex -> eval_expr ex ctx) |> Val.Object
             | Expr.Array xs ->  xs |> List.map (fun ex -> eval_expr ex ctx) |> Val.Array
-            | Expr.Closure x ->
-                match eval_expr x ctx with
-                | Val.Closure req -> Val.Closure req
-                | x -> failwithf "Expected a closure here but got %A" x
 
             | Expr.Piped_Input -> 
                 match Map.tryFind "" ctx.Variables with

@@ -46,7 +46,7 @@ module Parser =
         let keyValue = (stringLiteral <|> ident) .>>. (ws >>. str ":" >>. ws >>. exparser)
         let jobject = listBetweenStrings "{" "}" keyValue (Map.ofList >> Expr.Object)
 
-        let closure = pchar '@' >>. exparser |>> Expr.Closure
+        //let closure = pchar '@' >>. exparser |>> Expr.Closure
 
         do vparserRef := choiceL [jobject; jlist; closure; jstring; jnumber; jtrue; jfalse; jnull] "Value"
 
