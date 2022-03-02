@@ -50,10 +50,13 @@ module Parser =
         let jfalse = stringReturn "false" (Expr.Bool false)
         let jnull = stringReturn "null" Expr.Null
         let jnumber = 
-            (many1Satisfy isDigit) .>>. opt (pchar '.' >>. many1Satisfy isDigit)
+            tuple3
+                (opt (pstring "-"))
+                (many1Satisfy isDigit)
+                (opt (pchar '.' >>. many1Satisfy isDigit))
             |>> function
-                | (pre, Some post) -> pre + "." + post
-                | (pre, None) -> pre
+                | (sign, pre, Some post) -> Option.defaultValue "" sign + pre + "." + post
+                | (sign, pre, None) -> Option.defaultValue "" sign + pre
             |>> System.Double.TryParse
             |>> fun (s, v) -> Expr.Number v
 
@@ -75,7 +78,7 @@ module Parser =
         | Prop of string
         | Sub of Expr
 
-    let exprParser =
+    let exprParser, exprPipeParser =
 
         let var = pchar '$' >>. ident |>> Expr.Variable
         let pipe_input = pchar '$' >>% Expr.Pipeline_Variable
@@ -100,8 +103,8 @@ module Parser =
                 | [] -> ex
             many (subscript <|> property)
             |>> foldSuffixes ex
-        let pipeline ex =
-            attempt (spaces >>. pchar '|' >>. spaces >>. exprForgiveBrackets) |>> fun rest -> Expr.Pipeline (ex, rest)
+        let rec pipeline ex =
+            attempt (spaces >>. pchar '|' >>. spaces >>. (exprForgiveBrackets >>= pipeline)) |>> fun rest -> Expr.Pipeline (ex, rest)
             <|> preturn ex
 
         let brackets = between (pchar '(') (pchar ')') exparser
@@ -109,9 +112,8 @@ module Parser =
         do exparserRef := 
             choiceL [attempt var; ternary; pipe_input; value; attempt command; brackets] "Expression"
             >>= suffixes
-            >>= pipeline
 
-        exparser
+        exparser, exprForgiveBrackets >>= pipeline
 
     type private ReqExFrag =
         | Flag of name: string * value: Expr
@@ -150,9 +152,9 @@ module Parser =
             tuple3
                 (pstring "let" >>. spaces1 >>. ident .>> spaces)
                 (opt (pstring ":" >>. spaces >>. typeParser .>> spaces))
-                (pstring "=" >>. spaces >>. exparser)
+                (pstring "=" >>. spaces >>. exprPipeParser)
             |>> Statement.Declare
 
-        let eval = exprForgiveBrackets |>> Statement.Eval
+        let eval = exprPipeParser |>> Statement.Eval
 
         choiceL [decl; help; eval] "Statement"

@@ -20,15 +20,15 @@ module Library =
 
             ctx.Write("usage: " + name)
             for arg, ty in signature.Args do
-                ctx.Write(" <" + arg + ">")
+                ctx.Write(sprintf " <%s: %O>" arg ty)
             for arg, ty in signature.OptArgs do
-                ctx.Write(" [" + arg + "]")
-            ctx.WriteLine("")
+                ctx.Write(sprintf " [%s: %O]" arg ty)
+            ctx.WriteLine(" -> " + signature.ReturnType.ToString())
 
             if not signature.Flags.IsEmpty then
                 ctx.WriteLine("  options:")
             for (KeyValue (flag, ty)) in signature.Flags do
-                ctx.WriteLine("    -" + flag)
+                ctx.WriteLine(sprintf "    -%s : %O" flag ty)
 
             //todo: type information and help text
 
