@@ -81,8 +81,13 @@ module Check =
             |> List.ofSeq
             |> function [] -> Ok (Type.Object ts) | xs -> Error xs
         | Expr.Array xs -> Ok (Type.Array (Type.Any)) // nyi
-
-        | Expr.Piped_Input ->
+        
+        | Expr.Pipeline (head, rest) ->
+            match infer_type head ctx with
+            | Ok headTy ->
+                infer_type rest (ctx.WithPipelineType headTy)
+            | Error xs -> Error xs
+        | Expr.Pipeline_Variable ->
             match Map.tryFind "" ctx.Variables with
             | Some (ty, _) -> Ok ty
             | None -> Error (Err.one "The pipeline variable does not exist in this context")
@@ -107,21 +112,26 @@ module Check =
                 | None -> Error (Err.one (sprintf "Unrecognised property: '%s'" prop))
             | Ok _ -> Error (Err.one "Accessing property of a non-object")
             | Error xs -> Err.wraps "Object expression" xs
-        | Expr.Evaluate_Command reqex ->
-            match type_check_reqex Type.Any reqex ctx with
+        | Expr.Command reqex ->
+            match type_check_command Type.Any reqex ctx with
             | [] -> Ok ctx.Commands.[reqex.Name].Signature.ReturnType
             | xs -> Err.wraps "Command expression" xs
-        | Expr.Cond (cond, iftrue, iffalse) ->
-            match infer_type cond ctx with
-            | Ok Type.Bool ->
-                match infer_type iftrue ctx with
-                | Ok ty ->
-                    match type_check_expr ty iffalse ctx with
-                    | [] -> Ok ty
-                    | xs -> Err.wraps "False arm" xs
-                | Error xs -> Err.wraps "True arm" xs
-            | Ok _ -> Error (Err.one "Condition should be a boolean expression")
-            | Error xs -> Err.wraps "Condition" xs
+        | Expr.Cond (arms, basecase) ->
+            match infer_type basecase ctx with
+            | Ok ty ->
+                match List.choose (
+                    Err.pickf 
+                        ( fun (i, (cond, ex)) -> sprintf "Arm %i" i )
+                        ( fun (i, (cond, ex)) ->
+                            List.choose id
+                                [
+                                    Err.pick "Arm expression" (type_check_expr ty ex ctx)
+                                    Err.pick "Arm condition" (type_check_expr Type.Bool cond ctx)
+                                ]
+                        )
+                ) (List.indexed arms)
+                with [] -> Ok ty | xs -> Err.wraps "Conditional expression" xs
+            | Error xs -> Err.wraps "Base case" xs
         | Expr.Try (expr, iferror) -> Error (Err.one "nyi")
 
     and type_check_expr (t: Type) (ex: Expr) (ctx: Context) : Res =
@@ -146,7 +156,7 @@ module Check =
                     ( fun (i, x) -> sprintf "Item %i" i )
                     ( fun (i, x) -> type_check_expr ty x ctx )
             ) (List.indexed xs)
-        | _, Expr.Piped_Input ->
+        | _, Expr.Pipeline_Variable ->
             match Map.tryFind "" ctx.Variables with
             | Some (ty, _) -> List.choose id [Err.pick "Pipeline variable" (type_unify t ty)]
             | None -> Err.one "The pipeline variable does not exist in this context"
@@ -154,6 +164,11 @@ module Check =
             match Map.tryFind v ctx.Variables with
             | Some (ty, _) -> List.choose id [Err.pick (sprintf "Variable '%s'" v) (type_unify t ty)]
             | None -> Err.one (sprintf "Unrecognised variable: '%s'" v)
+        | ty, Expr.Pipeline (head, rest) ->
+            match infer_type head ctx with
+            | Ok headTy ->
+                type_check_expr ty rest (ctx.WithPipelineType headTy)
+            | Error xs -> xs
         | ty, Expr.Subscript (ex, sub) ->
             List.choose id
                 [
@@ -165,18 +180,26 @@ module Check =
                 [
                     Err.pick "Object expression" (type_check_expr (Type.Object (Map.ofList [(prop, ty)])) ex ctx)
                 ]
-        | ty, Expr.Evaluate_Command reqex -> 
+        | ty, Expr.Command reqex -> 
             List.choose id
                 [
-                    Err.pick "Error in command call" (type_check_reqex ty reqex ctx)
+                    Err.pick "Error in command call" (type_check_command ty reqex ctx)
                 ]
-        | ty, Expr.Cond (cond, iftrue, iffalse) ->
-            List.choose id
-                [
-                    Err.pick "Condition" (type_check_expr Type.Bool cond ctx)
-                    Err.pick "True arm" (type_check_expr ty iftrue ctx)
-                    Err.pick "False arm" (type_check_expr ty iffalse ctx)
-                ]
+        | ty, Expr.Cond (arms, basecase) ->
+            List.choose (
+                Err.pickf
+                    ( fun (i, (cond, ex)) -> sprintf "Arm %i" i )
+                    ( fun (i, (cond, ex)) ->
+                        List.choose id
+                            [
+                                Err.pick "Arm expression" (type_check_expr ty ex ctx)
+                                Err.pick "Arm condition" (type_check_expr Type.Bool cond ctx)
+                            ])
+            ) (List.indexed arms)
+            |> fun xs ->
+                match type_check_expr ty basecase ctx with
+                | [] -> xs
+                | errs -> Err.wrap "Base case" errs :: xs
         | ty, Expr.Try (expr, iferror) ->
             List.choose id
                 [
@@ -186,7 +209,7 @@ module Check =
         | Type.Any, _ -> []
         | _, _ -> Err.one (sprintf "Expected a %O but got: %O" t ex)
 
-    and type_check_reqex (t: Type) (rx: CommandRequest) (ctx: Context) : Res =
+    and type_check_command (t: Type) (rx: CommandRequest) (ctx: Context) : Res =
         match Map.tryFind rx.Name ctx.Commands with
         | None -> Err.one (sprintf "Unrecognised command '%s'" rx.Name)
         | Some cmd ->
@@ -233,6 +256,6 @@ module Check =
         match stmt with
         | Statement.Declare (name, ty, expr) ->
             type_check_expr (Option.defaultValue Type.Any ty) expr ctx
-        | Statement.Command req ->
-            type_check_reqex Type.Any req ctx
+        | Statement.Eval expr ->
+            type_check_expr Type.Any expr ctx
         | Statement.Help _ -> []

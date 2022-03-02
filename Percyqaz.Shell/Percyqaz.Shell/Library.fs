@@ -20,7 +20,7 @@ module Library =
 
             ctx.Write("usage: " + name)
             for arg, ty in signature.Args do
-                ctx.Write(" " + arg)
+                ctx.Write(" <" + arg + ">")
             for arg, ty in signature.OptArgs do
                 ctx.Write(" [" + arg + "]")
             ctx.WriteLine("")
@@ -45,9 +45,8 @@ module Library =
                         | Result.Ok t -> t
                         | Result.Error xs -> failwithf "Could not infer type for variable %s: %A" name xs
                 { ctx with Variables = Map.add name (vtype, eval_expr expr ctx) ctx.Variables }
-            | Statement.Command rx -> 
-                // todo: only auto-echo if turned on
-                match dispatch rx ctx with
+            | Statement.Eval expr -> 
+                match eval_expr expr ctx with
                 | Val.Null -> ()
                 | x -> sprintf "%O" x |> ctx.WriteLine
                 ctx
@@ -70,7 +69,10 @@ module Library =
             | Expr.Object m -> m |> Map.map (fun _ ex -> eval_expr ex ctx) |> Val.Object
             | Expr.Array xs ->  xs |> List.map (fun ex -> eval_expr ex ctx) |> Val.Array
 
-            | Expr.Piped_Input -> 
+            | Expr.Pipeline (head, rest) -> 
+                let hvalue = eval_expr head ctx
+                eval_expr rest (ctx.WithPipelineValue hvalue)
+            | Expr.Pipeline_Variable -> 
                 match Map.tryFind "" ctx.Variables with
                 | Some (ty, v) -> v
                 | None -> failwith "The pipeline variable does not exist in this context"
@@ -94,13 +96,18 @@ module Library =
                     if ms.ContainsKey prop then ms.[prop]
                     else failwithf "Object has no such property '%s'" prop
                 | _ -> failwith "This value is not an object"
-            | Expr.Evaluate_Command (rx: CommandRequest) ->
+            | Expr.Command (rx: CommandRequest) ->
                 dispatch rx ctx // todo: wrap exception that is thrown
-            | Expr.Cond (cond, iftrue, iffalse) ->
-                let c = eval_expr cond ctx
-                if (match c with Val.Bool b -> b | _ -> failwith "Condition must be a boolean") then
-                    eval_expr iftrue ctx
-                else eval_expr iffalse ctx
+            | Expr.Cond (arms, basecase) ->
+                let rec loop arms =
+                    match arms with
+                    | (cond, ex) :: arms ->
+                        let c = eval_expr cond ctx
+                        if (match c with Val.Bool b -> b | _ -> failwith "Condition must be a boolean") then
+                            eval_expr ex ctx
+                        else loop arms
+                    | [] -> eval_expr basecase ctx
+                loop arms
             | Expr.Try (ex, iferror) -> failwith "nyi"
 
         and dispatch (req: CommandRequest) (ctx: Context) : Val =
@@ -120,7 +127,7 @@ module Library =
             ctx
 
         member this.Execute(command: CommandRequest) : ShellResult<Val> =
-            match Check.type_check_reqex Type.Any command this with
+            match Check.type_check_command Type.Any command this with
             | [] -> 
                 try Context.dispatch command this |> Ok
                 with err -> RunFail err

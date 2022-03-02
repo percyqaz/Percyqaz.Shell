@@ -13,23 +13,23 @@ module Tree =
         | String
         | Bool
         | Number
+        | Null
         | Object of Map<string, Type>
         | Array of Type
-        | Null
         override this.ToString() =
             match this with
-            | Any -> "Any"
-            | String -> "String"
-            | Bool -> "Bool"
-            | Number -> "Number"
+            | Any -> "any"
+            | String -> "str"
+            | Bool -> "bool"
+            | Number -> "num"
+            | Null -> "null"
             | Object ms -> 
                 "{ " + 
                 ( Map.toSeq ms
                 |> Seq.map (fun (prop, ty) -> sprintf "%s: %O" prop ty)
                 |> String.concat "; " )
                 + " }"
-            | Array ty -> sprintf "%O[]" ty
-            | Null -> "Null"
+            | Array ty -> sprintf "array of %O" ty
 
     /// Values. These are the key building block of the shell
     /// All data is represented by these values
@@ -45,7 +45,7 @@ module Tree =
             match this with
             | String s -> sprintf "%A" s
             | Bool b -> sprintf "%b" b
-            | Number n -> sprintf "%f" n
+            | Number n -> sprintf "%O" n
             | Object ms -> 
                 "{ " + 
                 ( Map.toSeq ms
@@ -67,21 +67,22 @@ module Tree =
         | Object of Map<string, Expr>
         | Array of Expr list
 
-        | Piped_Input
+        | Pipeline of Expr * rest: Expr
+        | Pipeline_Variable
         | Variable of string
         | Subscript of main: Expr * sub: Expr
         | Property of main: Expr * prop: string
-        | Evaluate_Command of CommandRequest
-        | Cond of condition: Expr * iftrue: Expr * iffalse: Expr
+        | Command of CommandRequest
+        | Cond of arms: (Expr * Expr) list * basecase: Expr
         | Try of Expr * iferror: Expr
 
+    /// Enumeration of possible top-level actions a shell can provide
     and [<RequireQualifiedAccess>] Statement =
         | Declare of string * Type option * Expr
-        | Command of CommandRequest
+        | Eval of Expr
         | Help of string option
 
-    /// An unresolved command request, containing expressions as arguments.
-    /// Converted to a CommandRequest via resolution
+    /// An command call, containing expressions as arguments
     and CommandRequest =
         {
             Name: string
@@ -137,3 +138,5 @@ module Tree =
         member this.Write(str: string) = this.IO.Out.Write(str)
         member this.WriteLine(str: string) = this.IO.Out.WriteLine(str)
         member this.ReadLine() : string = this.IO.In.ReadLine()
+        member this.WithPipelineType(ty: Type) = { this with Variables = Map.add "" (ty, Val.Null) this.Variables }
+        member this.WithPipelineValue(value: Val) = { this with Variables = Map.add "" (Type.Any, value) this.Variables }
