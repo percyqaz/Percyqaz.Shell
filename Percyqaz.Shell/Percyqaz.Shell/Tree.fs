@@ -2,7 +2,7 @@
 
 open System
 
-module Tree =
+module rec Tree =
 
     /// Types. These are constraints on Values to ensure a command is getting only the kind of data it expects
     /// For example, a command that opens a file would only want to take Strings since a file name cannot be an Array
@@ -16,6 +16,7 @@ module Tree =
         | Null
         | Object of Map<string, Type>
         | Array of Type
+        | Fn of CommandSignature
         override this.ToString() =
             match this with
             | Any -> "any"
@@ -30,6 +31,19 @@ module Tree =
                 |> String.concat "; " )
                 + " }"
             | Array ty -> sprintf "array of %O" ty
+            | Fn sgn ->
+                ( sgn.Args
+                |> Seq.map (fun (arg, ty) -> sprintf "%O -> " ty)
+                |> String.concat "" )
+                + 
+                ( sgn.OptArgs
+                |> Seq.map (fun (arg, ty) -> sprintf "?%O -> " ty)
+                |> String.concat "" )
+                +
+                ( sgn.Flags |> Map.toSeq
+                |> Seq.map (fun (flag, ty) -> sprintf "#%s: %O -> " flag ty)
+                |> String.concat "" )
+                + sgn.ReturnType.ToString()
 
     /// Values. These are the key building block of the shell
     /// All data is represented by these values
@@ -41,6 +55,7 @@ module Tree =
         | Null
         | Object of Map<string, Val>
         | Array of Val list
+        | Lambda of signature: CommandSignature * body: Expr * context: Context
         override this.ToString() =
             match this with
             | String s -> sprintf "%A" s
@@ -57,15 +72,17 @@ module Tree =
                 ( xs |> List.map (sprintf "%O") |> String.concat ", " )
                 + " ]"
             | Null -> "null"
+            | Lambda (s, body, ctx) -> sprintf "<lambda of %O>" s
 
     /// Expression representations. These are evaluated to Vals during resolution
-    and [<RequireQualifiedAccess>] Expr =
+    type [<RequireQualifiedAccess>] Expr =
         | String of string
         | Number of float
         | Bool of bool
         | Null
         | Object of Map<string, Expr>
         | Array of Expr list
+        | Lambda of binds: (string * Type) list * returnType: Type option * body: Expr
 
         | Pipeline of Expr * rest: Expr
         | Pipeline_Variable
@@ -75,15 +92,16 @@ module Tree =
         | Command of CommandRequest
         | Cond of arms: (Expr * Expr) list * basecase: Expr
         | Try of Expr * iferror: Expr
+        | Block of Statement list * Expr
 
     /// Enumeration of possible top-level actions a shell can provide
-    and [<RequireQualifiedAccess>] Statement =
+    type [<RequireQualifiedAccess>] Statement =
         | Declare of string * Type option * Expr
         | Eval of Expr
         | Help of string option
 
     /// An command call, containing expressions as arguments
-    and CommandRequest =
+    type CommandRequest =
         {
             Name: string
             Args: Expr list
@@ -140,3 +158,4 @@ module Tree =
         member this.ReadLine() : string = this.IO.In.ReadLine()
         member this.WithPipelineType(ty: Type) = { this with Variables = Map.add "" (ty, Val.Null) this.Variables }
         member this.WithPipelineValue(value: Val) = { this with Variables = Map.add "" (Type.Any, value) this.Variables }
+        member this.WithVarType(name: string, ty: Type) = { this with Variables = Map.add name (ty, Val.Null) this.Variables }

@@ -19,13 +19,14 @@ module Parser =
 
         between (pstring "\"") (pstring "\"") (stringsSepBy normalCharSnippet escapedCharSnippet)
 
-    let private cmdparser, cmdparserRef = createParserForwardedToRef<CommandRequest, unit>()
-    let private exparser, exparserRef = createParserForwardedToRef<Expr, unit>()
+    let parse_command, private parse_commandR = createParserForwardedToRef<CommandRequest, unit>()
+    let parse_val_expr, private parse_val_exprR = createParserForwardedToRef<Expr, unit>()
+    let parse_expr, private parse_exprR = createParserForwardedToRef<Expr, unit>()
+    let parse_expr_ext, private parse_expr_extR = createParserForwardedToRef<Expr, unit>()
+    let parse_type, private parse_typeR = createParserForwardedToRef<Type, unit>()
+    let parse_block_stmt, private parse_block_stmtR = createParserForwardedToRef<Statement, unit>()
 
-    let exprForgiveBrackets = exparser <|> (cmdparser |>> Expr.Command)
-
-    let private typeParser =
-        let tparser, tparserRef = createParserForwardedToRef<Type, unit>()
+    do
     
         let any = stringReturn "any" Type.Any
         let bool = stringReturn "bool" Type.Bool
@@ -33,18 +34,16 @@ module Parser =
         let num = stringReturn "num" Type.Number
         
         let ws = spaces
-        let keyValue = (stringLiteral <|> ident) .>>. (ws >>. pstring ":" >>. ws >>. tparser)
+        let keyValue = (stringLiteral <|> ident) .>>. (ws >>. pstring ":" >>. ws >>. parse_type)
         let obj = between (pstring "{") (pstring "}") (ws >>. sepBy (keyValue .>> ws) (pstring ";" >>. ws) |>> Map.ofList |>> Type.Object)
 
-        let arr = pstring "array of" >>. tparser |>> Type.Array
+        let arr = pstring "array of" >>. spaces1 >>. parse_type |>> Type.Array
 
-        let brackets = between (pchar '(') (pchar ')') tparser
+        let brackets = between (pchar '(') (pchar ')') parse_type
         
-        do tparserRef := choiceL [any; bool; str; num; arr; obj; brackets] "Type"
-        tparser
+        parse_typeR := choiceL [any; bool; str; num; arr; obj; brackets] "Type"
 
-    let private valueExprParser = 
-        let vparser, vparserRef = createParserForwardedToRef<Expr, unit>()
+    do
 
         let jtrue  = stringReturn "true" (Expr.Bool true)
         let jfalse = stringReturn "false" (Expr.Bool false)
@@ -64,36 +63,31 @@ module Parser =
         let jstring = stringLiteral |>> Expr.String
         let listBetweenStrings sOpen sClose pElement f =
             between (pstring sOpen) (pstring sClose) (ws >>. sepBy (pElement .>> ws) (pstring "," >>. ws) |>> f)
-        let jlist = listBetweenStrings "[" "]" exparser Expr.Array
-        let keyValue = (stringLiteral <|> ident) .>>. (ws >>. pstring ":" >>. ws >>. exparser)
+        let jlist = listBetweenStrings "[" "]" parse_expr Expr.Array
+        let keyValue = (stringLiteral <|> ident) .>>. (ws >>. pstring ":" >>. ws >>. parse_expr)
         let jobject = listBetweenStrings "{" "}" keyValue (Map.ofList >> Expr.Object)
 
-        //let closure = pchar '@' >>. exparser |>> Expr.Closure
-
-        do vparserRef := choiceL [jobject; jlist; jstring; jnumber; jtrue; jfalse; jnull] "Value"
-
-        vparser
+        parse_val_exprR := choiceL [jobject; jlist; jstring; jnumber; jtrue; jfalse; jnull] "Value"
 
     type private Suffix =
         | Prop of string
         | Sub of Expr
 
-    let exprParser, exprPipeParser =
+    do
 
         let var = pchar '$' >>. ident |>> Expr.Variable
         let pipe_input = pchar '$' >>% Expr.Pipeline_Variable
-        let command = between (pchar '(') (pchar ')') cmdparser |>> Expr.Command
-        let value = valueExprParser
+        let command = between (pchar '(') (pchar ')') parse_command |>> Expr.Command
         // try catch
         let ternary =
             tuple3 
-                (pstring "if" >>. spaces1 >>. exparser .>> spaces1)
-                (pstring "then" >>. spaces1 >>. exparser .>> spaces1)
-                (pstring "else" >>. spaces1 >>. exparser)
+                (pstring "if" >>. spaces1 >>. parse_expr .>> spaces1)
+                (pstring "then" >>. spaces1 >>. parse_expr_ext .>> spaces1)
+                (pstring "else" >>. spaces1 >>. parse_expr_ext)
             |>> fun (cond, iftrue, iffalse) -> Expr.Cond ([cond, iftrue], iffalse)
 
         // suffixes
-        let subscript = between (pchar '[') (pchar ']') exparser |>> Sub
+        let subscript = between (pchar '[') (pchar ']') parse_expr |>> Sub
         let property = pchar '.' >>. ident |>> Prop
         let suffixes ex =
             let rec foldSuffixes ex xs =
@@ -104,32 +98,44 @@ module Parser =
             many (subscript <|> property)
             |>> foldSuffixes ex
         let rec pipeline ex =
-            attempt (spaces >>. pchar '|' >>. spaces >>. (exprForgiveBrackets >>= pipeline)) |>> fun rest -> Expr.Pipeline (ex, rest)
+            attempt (spaces >>. pchar '|' >>. spaces >>. (parse_expr_ext >>= pipeline)) |>> fun rest -> Expr.Pipeline (ex, rest)
             <|> preturn ex
 
-        let brackets = between (pchar '(') (pchar ')') exparser
+        let brackets = between (pchar '(' .>> spaces) (spaces >>. pchar ')') parse_expr_ext
 
-        do exparserRef := 
-            choiceL [attempt var; ternary; pipe_input; value; attempt command; brackets] "Expression"
+        // blocks
+        let block = 
+            let linesep = (spaces >>. pchar ';' .>> spaces)
+            between (pchar '{' .>> spaces) (spaces >>. pchar '}')
+                (
+                    (many (attempt (parse_block_stmt .>> linesep)))
+                    .>>. parse_expr_ext
+                )
+            |>> Expr.Block
+
+        parse_exprR := 
+            choiceL [attempt var; ternary; pipe_input; parse_val_expr; attempt command; brackets] "Expression"
             >>= suffixes
 
-        exparser, exprForgiveBrackets >>= pipeline
+        parse_expr_extR := 
+            attempt ((parse_expr <|> (parse_command |>> Expr.Command)) >>= pipeline)
+            <|> block
 
     type private ReqExFrag =
         | Flag of name: string * value: Expr
         | Arg of Expr
 
-    let commandParser =
+    do
             
         let flag = 
             tuple2
                 (pchar '-' >>. ident)
-                (opt (attempt (spaces >>. pchar '=' >>. spaces >>. exprParser)))
+                (opt (attempt (spaces >>. pchar '=' >>. spaces >>. parse_expr)))
             |>> fun (f, v) -> Flag (f, Option.defaultValue (Expr.Bool true) v)
 
-        let arg = exprParser |>> Arg
+        let arg = parse_expr |>> Arg
 
-        do cmdparserRef :=
+        parse_commandR :=
             tuple2 
                 ident
                 (many (attempt (spaces1 >>. choiceL [flag; arg] "Argument or flag")))
@@ -142,19 +148,19 @@ module Parser =
                     Flags = flags
                 }
 
-        cmdparser
-
-    let stmtParser =
+    let parse_toplevel_stmt =
         
         let help = (pstring "help" >>. opt (spaces1 >>. ident)) |>> Statement.Help
 
         let decl =
             tuple3
                 (pstring "let" >>. spaces1 >>. ident .>> spaces)
-                (opt (pstring ":" >>. spaces >>. typeParser .>> spaces))
-                (pstring "=" >>. spaces >>. exprPipeParser)
+                (opt (pstring ":" >>. spaces >>. parse_type .>> spaces))
+                (pstring "=" >>. spaces >>. parse_expr_ext)
             |>> Statement.Declare
 
-        let eval = exprPipeParser |>> Statement.Eval
+        let eval = parse_expr_ext |>> Statement.Eval
 
+        do parse_block_stmtR := choiceL [decl; eval] "Statement"
+        
         choiceL [decl; help; eval] "Statement"

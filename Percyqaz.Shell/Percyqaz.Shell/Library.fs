@@ -10,7 +10,7 @@ module Library =
     type ShellResult<'T> =
         | Ok of 'T
         | ParseFail of string
-        | TypeFail of Check.TypeError list
+        | TypeFail of Exception
         | RunFail of Exception
 
     module Help =
@@ -30,21 +30,15 @@ module Library =
             for (KeyValue (flag, ty)) in signature.Flags do
                 ctx.WriteLine(sprintf "    -%s : %O" flag ty)
 
-            //todo: type information and help text
+            //todo: help text
 
     module Context =
 
         let rec do_stmt (stmt: Statement) (ctx: Context) : Context =
             match stmt with
-            | Statement.Declare (name, ty, expr) ->
-                let vtype =
-                    match ty with
-                    | Some t -> t
-                    | None -> 
-                        match Check.infer_type expr ctx with
-                        | Result.Ok t -> t
-                        | Result.Error xs -> failwithf "Could not infer type for variable %s: %A" name xs
-                { ctx with Variables = Map.add name (vtype, eval_expr expr ctx) ctx.Variables }
+            | Statement.Declare (_, None, _) -> failwith "impossible; todo fix code smell"
+            | Statement.Declare (name, Some ty, expr) ->
+                { ctx with Variables = Map.add name (ty, eval_expr expr ctx) ctx.Variables }
             | Statement.Eval expr -> 
                 match eval_expr expr ctx with
                 | Val.Null -> ()
@@ -109,6 +103,13 @@ module Library =
                     | [] -> eval_expr basecase ctx
                 loop arms
             | Expr.Try (ex, iferror) -> failwith "nyi"
+            | Expr.Block (stmts, expr) ->
+                let rec loop stmts ctx =
+                    match stmts with
+                    | [] -> ctx
+                    | stmt :: xs -> loop xs (do_stmt stmt ctx)
+                eval_expr expr (loop stmts ctx)
+            | Expr.Lambda _ -> failwith "nyi"
 
         and dispatch (req: CommandRequest) (ctx: Context) : Val =
             let cmd = ctx.Commands.[req.Name]
@@ -127,38 +128,38 @@ module Library =
             ctx
 
         member this.Execute(command: CommandRequest) : ShellResult<Val> =
-            match Check.type_check_command Type.Any command this with
-            | [] -> 
-                try Context.dispatch command this |> Ok
+            try 
+                let chk = Check.type_check_command Type.Any command this
+                try Context.dispatch chk this |> Ok
                 with err -> RunFail err
-            | xs -> TypeFail xs
+            with exn -> TypeFail exn
                 
         member this.Execute(command: string) : ShellResult<Val> =
-            match run (Parser.commandParser .>> eof) command with
+            match run (Parser.parse_command .>> eof) command with
             | Success (res, _, _) -> this.Execute res
             | Failure (err, _, _) -> ParseFail err
 
         member this.Evaluate(ex: Expr) : ShellResult<Val> =
-            match Check.type_check_expr Type.Any ex this with
-            | [] -> 
-                try Context.eval_expr ex this |> Ok
+            try
+                let chk = Check.type_check_expr Type.Any ex this
+                try Context.eval_expr chk this |> Ok
                 with err -> RunFail err
-            | xs -> TypeFail xs
+            with exn -> TypeFail exn
             
         member this.Evaluate(command: string) : ShellResult<Val> =
-            match run (Parser.exprParser .>> eof) command with
+            match run (Parser.parse_expr_ext .>> eof) command with
             | Success (res, _, _) -> this.Evaluate res
             | Failure (err, _, _) -> ParseFail err
 
         member this.Interpret(stmt: Statement) : ShellResult<Context> =
-            match Check.type_check_stmt stmt this with
-            | [] -> 
-                try Context.do_stmt stmt this |> Ok
+            try
+                let chk, _ = Check.type_check_stmt stmt this
+                try Context.do_stmt chk this |> Ok
                 with err -> RunFail err
-            | xs -> TypeFail xs
+            with exn -> TypeFail exn
 
         member this.Interpret(command: string) : ShellResult<Context> =
-            match run (Parser.stmtParser .>> eof) command with
+            match run (Parser.parse_toplevel_stmt .>> eof) command with
             | Success (res, _, _) -> this.Interpret res
             | Failure (err, _, _) -> ParseFail err
 
@@ -183,7 +184,7 @@ module Library =
                 match ctx.Interpret(ctx.ReadLine()) with
                 | Ok c -> ()
                 | ParseFail err -> ctx.WriteLine err
-                | TypeFail errs -> for s in Check.Err.format errs do ctx.WriteLine s
+                | TypeFail exn -> ctx.WriteLine (sprintf "Type error: %s" exn.Message)
                 | RunFail exn -> ctx.WriteLine (sprintf "Error: %s" exn.Message)
                 
                 writer.Flush()
@@ -210,5 +211,5 @@ module Library =
                 match ctx.Interpret(ctx.ReadLine()) with
                 | Ok c -> ctx <- c
                 | ParseFail err -> printfn "%s" err
-                | TypeFail errs -> for s in Check.Err.format errs do printfn "%s" s
+                | TypeFail exn -> printfn "Type failure: %s" exn.Message
                 | RunFail exn -> printfn "Runtime failure: %s" exn.Message
