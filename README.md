@@ -8,5 +8,6 @@ KEY AIMS/FEATURES:
 - There is a type system (very typescript-like) that verifies all programs before any execution
 - Steal some ideas from functional programming/unix shells (like piping arguments being the main way to do productive things)
 
+- Shell interface can be exposed to other processes for inter-process communication (make your commands threadsafe yourself)
 - Ability to embed/interop shell engine with .NET code
 - Ability to use the shell as a general purpose shell (not my use case at the moment so batteries will not be included)
