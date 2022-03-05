@@ -74,40 +74,6 @@ module rec Tree =
             | Null -> "null"
             | Lambda (s, body, ctx) -> sprintf "<lambda of %O>" s
 
-    /// Expression representations. These are evaluated to Vals during resolution
-    type [<RequireQualifiedAccess>] Expr =
-        | String of string
-        | Number of float
-        | Bool of bool
-        | Null
-        | Object of Map<string, Expr>
-        | Array of Expr list
-        | Lambda of binds: (string * Type) list * returnType: Type option * body: Expr
-
-        | Pipeline of Expr * rest: Expr
-        | Pipeline_Variable
-        | Variable of string
-        | Subscript of main: Expr * sub: Expr
-        | Property of main: Expr * prop: string
-        | Command of CommandRequest
-        | Cond of arms: (Expr * Expr) list * basecase: Expr
-        | Try of Expr * iferror: Expr
-        | Block of Statement list * Expr
-
-    /// Enumeration of possible top-level actions a shell can provide
-    type [<RequireQualifiedAccess>] Statement =
-        | Declare of string * Type option * Expr
-        | Eval of Expr
-        | Help of string option
-
-    /// An command call, containing expressions as arguments
-    type CommandRequest =
-        {
-            Name: string
-            Args: Expr list
-            Flags: Map<string, Expr>
-        }
-
     /// Signature for a command, specifying what arguments and flags it takes
     type CommandSignature =
         {
@@ -116,6 +82,77 @@ module rec Tree =
             Flags: Map<string, Type>
             ReturnType: Type
         }
+
+    [<AutoOpen>]
+    module Syntax =
+
+        /// Expression representations. These are evaluated to Vals during resolution
+        type [<RequireQualifiedAccess>] Expr =
+            | String of string
+            | Number of float
+            | Bool of bool
+            | Null
+            | Object of Map<string, Expr>
+            | Array of Expr list
+            | Lambda of binds: (string * Type) list * returnType: Type option * body: Expr
+
+            | Pipeline of Expr * rest: Expr
+            | Pipeline_Variable
+            | Variable of string
+            | Subscript of main: Expr * sub: Expr
+            | Property of main: Expr * prop: string
+            | Command of CommandRequest
+            | Cond of arms: (Expr * Expr) list * basecase: Expr
+            | Try of Expr * iferror: Expr
+            | Block of Statement list * Expr
+
+        /// Enumeration of possible top-level actions a shell can provide
+        type [<RequireQualifiedAccess>] Statement =
+            | Declare of string * Type option * Expr
+            | Eval of Expr
+            | Help of string option
+
+        /// An command call, containing expressions as arguments
+        type CommandRequest =
+            {
+                Name: string
+                Args: Expr list
+                Flags: Map<string, Expr>
+            }
+
+    [<AutoOpen>]
+    module Checked =
+
+        type [<RequireQualifiedAccess>] ExprC =
+            | String of string
+            | Number of float
+            | Bool of bool
+            | Null
+            | Object of Map<string, ExprC>
+            | Array of ExprC list
+            | Lambda of binds: (string * Type) list * returnType: Type * body: ExprC
+
+            | Pipeline of ExprC * rest: ExprC
+            | Pipeline_Variable
+            | Variable of string
+            | Subscript of main: ExprC * sub: ExprC
+            | Property of main: ExprC * prop: string
+            | Command of CommandRequestC
+            | Cond of arms: (ExprC * ExprC) list * basecase: ExprC
+            | Try of ExprC * iferror: ExprC
+            | Block of StatementC list * ExprC
+
+        type [<RequireQualifiedAccess>] StatementC =
+            | Declare of string * Type * ExprC
+            | Eval of ExprC
+            | Help of string option
+
+        type CommandRequestC =
+            {
+                Name: string
+                Args: ExprC list
+                Flags: Map<string, ExprC>
+            }
 
     type IOContext =
         {

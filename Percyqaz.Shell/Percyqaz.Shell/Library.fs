@@ -34,47 +34,46 @@ module Library =
 
     module Context =
 
-        let rec do_stmt (stmt: Statement) (ctx: Context) : Context =
+        let rec do_stmt (stmt: StatementC) (ctx: Context) : Context =
             match stmt with
-            | Statement.Declare (_, None, _) -> failwith "impossible; todo fix code smell"
-            | Statement.Declare (name, Some ty, expr) ->
+            | StatementC.Declare (name, ty, expr) ->
                 { ctx with Variables = Map.add name (ty, eval_expr expr ctx) ctx.Variables }
-            | Statement.Eval expr -> 
+            | StatementC.Eval expr -> 
                 match eval_expr expr ctx with
                 | Val.Null -> ()
                 | x -> sprintf "%O" x |> ctx.WriteLine
                 ctx
-            | Statement.Help (Some command) ->
+            | StatementC.Help (Some command) ->
                 match Map.tryFind command ctx.Commands with
                 | Some c -> Help.show_signature ctx command c.Signature
                 | None -> ctx.WriteLine(sprintf "Unrecognised command: '%s'" command)
                 ctx
-            | Statement.Help None ->
+            | StatementC.Help None ->
                 ctx.WriteLine(sprintf "Available commands: %s" (String.concat ", " (ctx.Commands.Keys)))
                 ctx
 
-        and eval_expr (ex: Expr) (ctx: Context) : Val =
+        and eval_expr (ex: ExprC) (ctx: Context) : Val =
             match ex with
             
-            | Expr.String s -> Val.String s
-            | Expr.Number n -> Val.Number n
-            | Expr.Bool b -> Val.Bool b
-            | Expr.Null -> Val.Null
-            | Expr.Object m -> m |> Map.map (fun _ ex -> eval_expr ex ctx) |> Val.Object
-            | Expr.Array xs ->  xs |> List.map (fun ex -> eval_expr ex ctx) |> Val.Array
+            | ExprC.String s -> Val.String s
+            | ExprC.Number n -> Val.Number n
+            | ExprC.Bool b -> Val.Bool b
+            | ExprC.Null -> Val.Null
+            | ExprC.Object m -> m |> Map.map (fun _ ex -> eval_expr ex ctx) |> Val.Object
+            | ExprC.Array xs ->  xs |> List.map (fun ex -> eval_expr ex ctx) |> Val.Array
 
-            | Expr.Pipeline (head, rest) -> 
+            | ExprC.Pipeline (head, rest) -> 
                 let hvalue = eval_expr head ctx
                 eval_expr rest (ctx.WithPipelineValue hvalue)
-            | Expr.Pipeline_Variable -> 
+            | ExprC.Pipeline_Variable -> 
                 match Map.tryFind "" ctx.Variables with
                 | Some (ty, v) -> v
                 | None -> failwith "The pipeline variable does not exist in this context"
-            | Expr.Variable x -> 
+            | ExprC.Variable x -> 
                 match Map.tryFind x ctx.Variables with
                 | Some (ty, v) -> v
                 | None -> failwithf "Unrecognised variable: '%s'" x
-            | Expr.Subscript (main, sub) -> 
+            | ExprC.Subscript (main, sub) -> 
                 let m = eval_expr main ctx
                 let s = eval_expr sub ctx
                 match m with
@@ -83,16 +82,16 @@ module Library =
                     | Val.Number f -> xs.[int f]
                     | _ -> failwith "Must subscript arrays with a number"
                 | _ -> failwith "This value is not subscriptable"
-            | Expr.Property (main, prop) ->
+            | ExprC.Property (main, prop) ->
                 let m = eval_expr main ctx
                 match m with
                 | Val.Object ms ->
                     if ms.ContainsKey prop then ms.[prop]
                     else failwithf "Object has no such property '%s'" prop
                 | _ -> failwith "This value is not an object"
-            | Expr.Command (rx: CommandRequest) ->
+            | ExprC.Command (rx: CommandRequestC) ->
                 dispatch rx ctx // todo: wrap exception that is thrown
-            | Expr.Cond (arms, basecase) ->
+            | ExprC.Cond (arms, basecase) ->
                 let rec loop arms =
                     match arms with
                     | (cond, ex) :: arms ->
@@ -102,16 +101,16 @@ module Library =
                         else loop arms
                     | [] -> eval_expr basecase ctx
                 loop arms
-            | Expr.Try (ex, iferror) -> failwith "nyi"
-            | Expr.Block (stmts, expr) ->
+            | ExprC.Try (ex, iferror) -> failwith "nyi"
+            | ExprC.Block (stmts, expr) ->
                 let rec loop stmts ctx =
                     match stmts with
                     | [] -> ctx
                     | stmt :: xs -> loop xs (do_stmt stmt ctx)
                 eval_expr expr (loop stmts ctx)
-            | Expr.Lambda _ -> failwith "nyi"
+            | ExprC.Lambda _ -> failwith "nyi"
 
-        and dispatch (req: CommandRequest) (ctx: Context) : Val =
+        and dispatch (req: CommandRequestC) (ctx: Context) : Val =
             let cmd = ctx.Commands.[req.Name]
             cmd.Implementation
                 {
