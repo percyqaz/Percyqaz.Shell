@@ -12,6 +12,7 @@ module DotNetInterop =
         let integer = function Val.Number i -> (int i) :> obj | _ -> failwith "lens"
         let float = function Val.Number n -> n :> obj | _ -> failwith "lens"
         let unit = function Val.Null -> () :> obj | _ -> failwith "lens"
+        let object = function Val.Object m -> m :> obj | _ -> failwith "lens"
 
         let rec create (ty: System.Type) =
             if ty = typeof<string> then string, Type.String
@@ -19,6 +20,7 @@ module DotNetInterop =
             elif ty = typeof<int> then integer, Type.Number
             elif ty = typeof<float> then float, Type.Number
             elif ty = typeof<unit> then unit, Type.Null
+            elif ty = typeof<Map<string, Val>> then object, (Type.Object Map.empty)
             elif ty.IsArray then 
                 let elementType = ty.GetElementType()
                 let lens, etype = create (elementType)
@@ -44,6 +46,7 @@ module DotNetInterop =
             | :? float as f -> Val.Number f
             | :? unit -> Val.Null
             | :? array<obj> as xs -> Array.map fromObj xs |> List.ofArray |> Val.Array
+            | :? Map<string, Val> as xs -> Val.Object xs
             | :? Val as v -> v
             | _ -> Val.Null
 

@@ -123,6 +123,7 @@ module Check =
                     new_xs <- Map.add prop (type_check_expr Type.Any propEx ctx) new_xs
             ) xs
             ExprC.Object new_xs
+
         | Patterns.Array ty, Expr.Array xs ->
             List.map (fun item -> type_check_expr ty item ctx) xs |> ExprC.Array
         | _, Expr.Pipeline_Variable ->

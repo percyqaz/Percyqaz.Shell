@@ -79,12 +79,15 @@ module Parser =
         let pipe_input = pchar '$' >>% Expr.Pipeline_Variable
         let command = between (pchar '(') (pchar ')') parse_command |>> Expr.Command
         // try catch
-        let ternary =
+        let cond =
+            let arm name =
+                (pstring name >>. spaces1 >>. parse_expr .>> spaces1)
+                .>>. (pstring "then" >>. spaces1 >>. parse_expr_ext .>> spaces1)
             tuple3 
-                (pstring "if" >>. spaces1 >>. parse_expr .>> spaces1)
-                (pstring "then" >>. spaces1 >>. parse_expr_ext .>> spaces1)
+                (arm "if")
+                (many (arm "elif"))
                 (pstring "else" >>. spaces1 >>. parse_expr_ext)
-            |>> fun (cond, iftrue, iffalse) -> Expr.Cond ([cond, iftrue], iffalse)
+            |>> fun (head, body, basecase) -> Expr.Cond (head :: body, basecase)
 
         // suffixes
         let subscript = between (pchar '[') (pchar ']') parse_expr |>> Sub
@@ -114,7 +117,7 @@ module Parser =
             |>> Expr.Block
 
         parse_exprR := 
-            choiceL [attempt var; ternary; pipe_input; parse_val_expr; attempt command; brackets] "Expression"
+            choiceL [attempt var; cond; pipe_input; parse_val_expr; attempt command; brackets] "Expression"
             >>= suffixes
 
         parse_expr_extR := 
