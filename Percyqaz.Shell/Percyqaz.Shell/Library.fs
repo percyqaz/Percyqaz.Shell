@@ -108,7 +108,23 @@ module Library =
                     | [] -> ctx
                     | stmt :: xs -> loop xs (do_stmt stmt ctx)
                 eval_expr expr (loop stmts ctx)
-            | ExprC.Lambda _ -> failwith "nyi"
+            | ExprC.Lambda (binds, returnType, body) ->
+                Val.Lambda ({ Args = binds; OptArgs = List.empty; Flags = Map.empty; ReturnType = returnType }, body, ctx)
+            | ExprC.Call_Lambda (l, args, flags) ->
+                match eval_expr l ctx with
+                | Val.Lambda (sgn, body, captured_ctx) ->
+                    let mutable args = args
+                    let mutable lctx = captured_ctx
+                    for (argName, ty) in sgn.Args do
+                        lctx <- lctx.WithVar(argName, eval_expr (List.head args) ctx, ty)
+                        args <- List.tail args
+                    for (argName, ty) in sgn.OptArgs do
+                        if not args.IsEmpty then
+                            lctx <- lctx.WithVar(argName, eval_expr (List.head args) ctx, ty)
+                            args <- List.tail args
+                    // todo: flags (we don't care rn)
+                    eval_expr body lctx
+                | _ -> failwith "impossible after type checks"
 
         and dispatch (req: CommandRequestC) (ctx: Context) : Val =
             let cmd = ctx.Commands.[req.Name]

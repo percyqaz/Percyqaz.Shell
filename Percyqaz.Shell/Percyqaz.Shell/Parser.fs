@@ -26,6 +26,8 @@ module Parser =
     let parse_type, private parse_typeR = createParserForwardedToRef<Type, unit>()
     let parse_block_stmt, private parse_block_stmtR = createParserForwardedToRef<Statement, unit>()
 
+    type private FtypeFrag = Arg | Opt | Flag
+
     do
     
         let any = stringReturn "any" Type.Any
@@ -40,8 +42,26 @@ module Parser =
         let arr = pstring "array of" >>. spaces1 >>. parse_type |>> Type.Array
 
         let brackets = between (pchar '(') (pchar ')') parse_type
+
+        let func =
+            let arg = ident .>> spaces .>> pchar ':' .>> spaces .>>. parse_type |>> fun x -> (x, Arg)
+            let opt = pchar '?' >>. ident .>> spaces .>> pchar ':' .>> spaces .>>. parse_type |>> fun x -> (x, Opt)
+            let flag = pchar '#' >>. ident .>> spaces .>> pchar ':' .>> spaces .>>. parse_type |>> fun x -> (x, Flag)
+
+            let sep = spaces >>. pchar ',' >>. spaces
+            tuple2
+                (pchar '|' >>. spaces >>. sepBy (arg <|> opt <|> flag) sep .>> spaces)
+                (pchar '|' >>. spaces >>. pstring "->" >>. spaces >>. parse_type)
+            |>> fun (args, ret) ->
+                Type.Fn
+                    {
+                        Args = List.filter (fun (_, t) -> t = Arg) args |> List.map fst
+                        OptArgs = List.filter (fun (_, t) -> t = Opt) args |> List.map fst
+                        Flags = List.filter (fun (_, t) -> t = Flag) args |> List.map fst |> Map.ofList
+                        ReturnType = ret
+                    }
         
-        parse_typeR := choiceL [any; bool; str; num; arr; obj; brackets] "Type"
+        parse_typeR := choiceL [any; bool; str; num; arr; obj; func; brackets] "Type"
 
     do
 
@@ -72,6 +92,7 @@ module Parser =
     type private Suffix =
         | Prop of string
         | Sub of Expr
+        | Call of Expr list // todo: flags
 
     do
 
@@ -90,21 +111,37 @@ module Parser =
             |>> fun (head, body, basecase) -> Expr.Cond (head :: body, basecase)
 
         // suffixes
-        let subscript = between (pchar '[') (pchar ']') parse_expr |>> Sub
+        let subscript = between (pchar '[' >>. spaces) (spaces >>. pchar ']') parse_expr |>> Sub
         let property = pchar '.' >>. ident |>> Prop
+        let call = between (pchar '(' >>. spaces) (spaces .>> pchar ')') (sepBy parse_expr (spaces >>. pchar ',' >>. spaces)) |>> Call
         let suffixes ex =
             let rec foldSuffixes ex xs =
                 match xs with
                 | Prop p :: xs -> foldSuffixes (Expr.Property (ex, p)) xs
                 | Sub s :: xs -> foldSuffixes (Expr.Subscript(ex, s)) xs
+                | Call args :: xs -> foldSuffixes (Expr.Call_Lambda(ex, args, Map.empty)) xs
                 | [] -> ex
-            many (subscript <|> property)
+            many (subscript <|> property <|> call)
             |>> foldSuffixes ex
+
         let rec pipeline ex =
             attempt (spaces >>. pchar '|' >>. spaces >>. (parse_expr_ext >>= pipeline)) |>> fun rest -> Expr.Pipeline (ex, rest)
             <|> preturn ex
 
         let brackets = between (pchar '(' .>> spaces) (spaces >>. pchar ')') parse_expr_ext
+
+        // lambdas
+        let lambda =
+             let arg = ident .>>. (spaces .>>. pchar ':' >>. spaces >>. parse_type)
+             //let opt = (pchar '?' >>. ident) .>>. (spaces >>. pchar ':' >>. spaces >>. parse_type) |>> fun x -> (x, Opt)
+             //let flag = (pchar '#' >>. ident) .>>. (spaces >>. pchar ':' >>. spaces >>. parse_type) |>> fun x -> (x, Flag)
+
+             let sep = spaces >>. pchar ',' >>. spaces
+             tuple3
+                 (pchar '|' >>. spaces >>. sepBy arg sep .>> spaces)
+                 (pchar '|' >>. opt (attempt (spaces >>. pchar ':' >>. spaces >>. parse_type)))
+                 (spaces >>. pstring "->" >>. spaces >>. parse_expr_ext)
+             |>> Expr.Lambda
 
         // blocks
         let block = 
@@ -117,7 +154,7 @@ module Parser =
             |>> Expr.Block
 
         parse_exprR := 
-            choiceL [attempt var; cond; pipe_input; parse_val_expr; attempt command; brackets] "Expression"
+            choiceL [attempt var; cond; pipe_input; parse_val_expr; lambda; attempt command; brackets] "Expression"
             >>= suffixes
 
         parse_expr_extR := 

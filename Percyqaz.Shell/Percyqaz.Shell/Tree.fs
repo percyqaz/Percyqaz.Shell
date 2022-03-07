@@ -55,7 +55,7 @@ module rec Tree =
         | Null
         | Object of Map<string, Val>
         | Array of Val list
-        | Lambda of signature: CommandSignature * body: Expr * context: Context
+        | Lambda of signature: CommandSignature * body: ExprC * context: Context
         override this.ToString() =
             match this with
             | String s -> sprintf "%A" s
@@ -105,6 +105,7 @@ module rec Tree =
             | Cond of arms: (Expr * Expr) list * basecase: Expr
             | Try of Expr * iferror: Expr
             | Block of Statement list * Expr
+            | Call_Lambda of Expr * args: Expr list * flags: Map<string, Expr>
 
         /// Enumeration of possible top-level actions a shell can provide
         type [<RequireQualifiedAccess>] Statement =
@@ -141,6 +142,7 @@ module rec Tree =
             | Cond of arms: (ExprC * ExprC) list * basecase: ExprC
             | Try of ExprC * iferror: ExprC
             | Block of StatementC list * ExprC
+            | Call_Lambda of ExprC * args: ExprC list * flags: Map<string, ExprC>
 
         type [<RequireQualifiedAccess>] StatementC =
             | Declare of string * Type * ExprC
@@ -196,3 +198,4 @@ module rec Tree =
         member this.WithPipelineType(ty: Type) = { this with Variables = Map.add "" (ty, Val.Null) this.Variables }
         member this.WithPipelineValue(value: Val) = { this with Variables = Map.add "" (Type.Any, value) this.Variables }
         member this.WithVarType(name: string, ty: Type) = { this with Variables = Map.add name (ty, Val.Null) this.Variables }
+        member this.WithVar(name: string, value: Val, ty: Type) = { this with Variables = Map.add name (ty, value) this.Variables }

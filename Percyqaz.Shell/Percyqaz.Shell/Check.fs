@@ -26,6 +26,10 @@ module Check =
                 if ys.ContainsKey(prop) then type_unify propType ys.[prop]
                 else failwithf "Target type requires property '%s' : %O" prop propType
         | Type.Array t1, Type.Array t2 -> type_unify t1 t2
+        | Type.Fn target, Type.Fn source ->
+            type_unify target.ReturnType source.ReturnType
+            if { source with ReturnType = target.ReturnType } <> target then
+                failwith "Lambda types don't match (and I'm too lazy to add more unification rules)"
         | _, _ -> failwithf "Cannot unify actual type %O with expected type %O" current target
 
     /// returns inferred type + adjusted expression, or throws exception
@@ -100,7 +104,53 @@ module Check =
             let stmtsChecked, resultingCtx = loop stmts ctx
             let ty, exprChecked = infer_type expr resultingCtx
             ty, ExprC.Block (stmtsChecked, exprChecked)
-        | Expr.Lambda _ -> failwith "nyi"
+        | Expr.Lambda (binds, ret, body) ->
+            let rec ctxLoop binds (ctx: Context) =
+                match binds with
+                | [] -> ctx
+                | (name, ty) :: bs -> ctxLoop bs (ctx.WithVarType(name, ty))
+            let ctx = ctxLoop binds ctx
+            let returnType, bodyChecked =
+                match ret with
+                | Some ty -> ty, type_check_expr ty body ctx
+                | None -> infer_type body ctx
+            Type.Fn
+                {
+                    Args = binds
+                    OptArgs = []
+                    Flags = Map.empty
+                    ReturnType = returnType
+                },
+            ExprC.Lambda (binds, returnType, bodyChecked)
+        | Expr.Call_Lambda (lambda, args, flags) ->
+            let ltype, lchecked = infer_type lambda ctx
+            match ltype with
+            | Type.Fn sgn ->
+                let mutable args = args
+                let mutable checked_args = []
+                for (name, ty) in sgn.Args do
+                    match args with
+                    | x :: xs ->
+                        checked_args <- type_check_expr ty x ctx :: checked_args
+                        args <- xs
+                    | [] -> failwithf "Missing argument '%s' : %O" name ty
+                for (name, ty) in sgn.OptArgs do
+                    match args with
+                    | x :: xs ->
+                        checked_args <- type_check_expr ty x ctx :: checked_args
+                        args <- xs
+                    | [] -> ()
+                if args <> [] then failwithf "Unexpected argument(s): %s" (List.map (sprintf "%O") args |> String.concat ", ")
+                let checked_flags =
+                    Map.map
+                        ( fun name v ->
+                            if sgn.Flags.ContainsKey name then
+                                type_check_expr sgn.Flags.[name] v ctx
+                            else failwithf "Unrecognised flag '%s'" name
+                        ) flags
+                sgn.ReturnType, ExprC.Call_Lambda (lchecked, List.rev checked_args, checked_flags)
+            | _ -> failwith "Expression is not callable"
+
         
     /// returns adjusted expression (for casts and stuff) or throws exception
     and type_check_expr (t: Type) (ex: Expr) (ctx: Context) : ExprC =
@@ -123,6 +173,10 @@ module Check =
                     new_xs <- Map.add prop (type_check_expr Type.Any propEx ctx) new_xs
             ) xs
             ExprC.Object new_xs
+        | ty, Expr.Lambda _ ->
+            let fty, lchecked = infer_type ex ctx
+            type_unify ty fty
+            lchecked
 
         | Patterns.Array ty, Expr.Array xs ->
             List.map (fun item -> type_check_expr ty item ctx) xs |> ExprC.Array
@@ -173,7 +227,10 @@ module Check =
             let stmtsChecked, resultingCtx = loop stmts ctx
             let exprChecked = type_check_expr ty expr resultingCtx
             ExprC.Block (stmtsChecked, exprChecked)
-        | ty, Expr.Lambda _ -> failwith "nyi"
+        | ty, Expr.Call_Lambda _ ->
+            let ltype, lchecked = infer_type ex ctx
+            type_unify ty ltype
+            lchecked
         | _, _ -> failwithf "Expected a %O but got: %O" t ex
         
     /// returns adjusted request (for casts and stuff) or throws exception
