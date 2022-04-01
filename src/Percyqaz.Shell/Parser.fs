@@ -99,7 +99,7 @@ module Parser =
         let var = pchar '$' >>. ident |>> Expr.Variable
         let pipe_input = pchar '$' >>% Expr.Pipeline_Variable
         let command = between (pchar '(') (pchar ')') parse_command |>> Expr.Command
-        // try catch
+        // todo: try catch
         let cond =
             let arm name =
                 (pstring name >>. spaces1 >>. parse_expr .>> spaces1)

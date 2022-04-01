@@ -3,9 +3,9 @@
 ################################################################################
 
 /.vs
-/Percyqaz.Shell/.vs/Percyqaz.Shell
-/Percyqaz.Shell/Percyqaz.Shell/bin/
-/Percyqaz.Shell/Percyqaz.Shell/obj
-/Percyqaz.Shell/Percyqaz.Shell.Examples/bin
-/Percyqaz.Shell/Percyqaz.Shell.Examples/obj
-/Percyqaz.Shell/Percyqaz.Shell/nuget.config
+/src/.vs/Percyqaz.Shell
+/src/Percyqaz.Shell/bin/
+/src/Percyqaz.Shell/obj
+/src/Percyqaz.Shell.Examples/bin
+/src/Percyqaz.Shell.Examples/obj
+/src/Percyqaz.Shell/nuget.config
