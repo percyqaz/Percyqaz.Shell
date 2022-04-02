@@ -1,21 +1,25 @@
-﻿open Percyqaz.Shell.Library
-open Percyqaz.Shell.Tree
-open System.Runtime.InteropServices
+﻿//open Percyqaz.Shell.Library
+//open Percyqaz.Shell.Tree
+//open System.Runtime.InteropServices
 
-type Test =
+//type Test =
 
-    static member Add_Default_Five (x: int, [<Optional; DefaultParameterValue(5)>] y: int) = x + y
+//    static member Add_Default_Five (x: int, [<Optional; DefaultParameterValue(5)>] y: int) = x + y
         
-    static member Echo (input: Val) : unit = printfn "%O" input
+//    static member Echo (input: Val) : unit = printfn "%O" input
 
-    static member Sum (xs: int array) = Array.sum xs
+//    static member Sum (xs: int array) = Array.sum xs
 
-    static member Host () =
-        printfn "serving"
-        ShellInterface.serve "SHELL-TEST" (Context.Create<Test>())
-        printfn "not serving"
+//    static member Host () =
+//        printfn "serving"
+//        ShellInterface.serve "SHELL-TEST" (Context.Create<Test>())
+//        printfn "not serving"
 
-    static member Connect (command: string) =
-        ShellInterface.connect "SHELL-TEST" command
+//    static member Connect (command: string) =
+//        ShellInterface.connect "SHELL-TEST" command
 
-ShellInterface.basic_repl<Test>()
+//ShellInterface.basic_repl<Test>()
+
+open Percyqaz.Shell.v2.Library
+
+Interface.basic_repl<_>()
