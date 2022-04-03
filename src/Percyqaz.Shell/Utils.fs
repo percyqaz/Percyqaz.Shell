@@ -61,7 +61,6 @@ module Types =
             (function Val.Arr xs -> List.map ty.Up xs |> Array.ofList | x -> unexpected x "Expected an array")
             (Array.toList >> List.map ty.Down >> Val.Arr)
 
-
 type private _Impl = Val list -> Val
 
 type Impl =
@@ -176,3 +175,43 @@ module Command =
             Binds = args
             Impl = impl
         }
+
+    let create_anon (arity : int) (impl: _Impl) =
+        create "Anonymous function"
+            (seq {0 .. arity} |> List.ofSeq |> List.map (sprintf "arg%i"))
+            impl
+        |> Val.Func
+
+module FuncTypes =
+
+    open Types
+    
+    let func0 (ret: Type<'T>) : Type<unit -> 'T> =
+        create (sprintf "%s -> %s" "Nil" ret.Name)
+            (function Val.Func f -> (fun () -> ret.Up (f.Impl [])) | x -> unexpected x "Expected a function")
+            (fun (f: unit -> 'T) -> Command.create_anon 0 (Impl.Create(f, ret)))
+
+    let func1 (a1: Type<'A>, ret: Type<'T>) : Type<'A -> 'T> =
+        create (sprintf "%s -> %s" a1.Name ret.Name)
+            (function Val.Func f -> (fun a -> ret.Up (f.Impl [a1.Down a])) | x -> unexpected x "Expected a function")
+            (fun (f: 'A -> 'T) -> Command.create_anon 0 (Impl.Create(a1, f, ret)))
+
+    let func2 (a1: Type<'A>, a2: Type<'B>, ret: Type<'T>) : Type<'A -> 'B -> 'T> =
+        create (sprintf "%s -> %s -> %s" a1.Name a2.Name ret.Name)
+            (function Val.Func f -> (fun a b -> ret.Up (f.Impl [a1.Down a; a2.Down b])) | x -> unexpected x "Expected a function")
+            (fun (f: 'A -> 'B -> 'T) -> Command.create_anon 0 (Impl.Create(a1, a2, f, ret)))
+
+    let func3 (a1: Type<'A>, a2: Type<'B>, a3: Type<'C>, ret: Type<'T>) : Type<'A -> 'B -> 'C -> 'T> =
+        create (sprintf "%s -> %s -> %s" a1.Name a2.Name ret.Name)
+            (function Val.Func f -> (fun a b c -> ret.Up (f.Impl [a1.Down a; a2.Down b; a3.Down c])) | x -> unexpected x "Expected a function")
+            (fun (f: 'A -> 'B -> 'C -> 'T) -> Command.create_anon 0 (Impl.Create(a1, a2, a3, f, ret)))
+
+    let func4 (a1: Type<'A>, a2: Type<'B>, a3: Type<'C>, a4: Type<'D>, ret: Type<'T>) : Type<'A -> 'B -> 'C -> 'D -> 'T> =
+        create (sprintf "%s -> %s -> %s" a1.Name a2.Name ret.Name)
+            (function Val.Func f -> (fun a b c d -> ret.Up (f.Impl [a1.Down a; a2.Down b; a3.Down c; a4.Down d])) | x -> unexpected x "Expected a function")
+            (fun (f: 'A -> 'B -> 'C -> 'D -> 'T) -> Command.create_anon 0 (Impl.Create(a1, a2, a3, a4, f, ret)))
+
+    let func5 (a1: Type<'A>, a2: Type<'B>, a3: Type<'C>, a4: Type<'D>, a5: Type<'E>, ret: Type<'T>) : Type<'A -> 'B -> 'C -> 'D -> 'E -> 'T> =
+        create (sprintf "%s -> %s -> %s" a1.Name a2.Name ret.Name)
+            (function Val.Func f -> (fun a b c d e -> ret.Up (f.Impl [a1.Down a; a2.Down b; a3.Down c; a4.Down d; a5.Down e])) | x -> unexpected x "Expected a function")
+            (fun (f: 'A -> 'B -> 'C -> 'D -> 'E -> 'T) -> Command.create_anon 0 (Impl.Create(a1, a2, a3, a4, a5, f, ret)))

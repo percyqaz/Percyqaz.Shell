@@ -72,7 +72,6 @@ module Parser =
                 (pstring "else" >>. spaces1 >>. parse_expr_ext)
             |>> fun (head, body, basecase) -> Expr.Cond (head :: body, basecase)
 
-        // suffixes
         let subscript = between (pchar '[' >>. spaces) (spaces >>. pchar ']') parse_expr_ext |>> Sub
         let property = pchar '.' >>. ident |>> Prop
         let call = between (pchar '(' >>. spaces) (spaces .>> pchar ')') (sepBy parse_expr_ext (spaces >>. pchar ',' >>. spaces)) |>> Call
@@ -143,11 +142,11 @@ module Parser =
             |>> Expr.Block
 
         parse_exprR := 
-            choiceL [attempt var; cond; pipe_input; monop; lambda; parse_val_expr; brackets] "Expression"
+            choiceL [attempt var; cond; pipe_input; monop; parse_val_expr; brackets] "Expression"
             >>= suffixes
 
         parse_expr_extR := 
-            attempt ((parse_expr <|> (parse_command |>> Expr.Cmd)) |> binops)
+            attempt ((lambda <|> parse_expr <|> (parse_command |>> Expr.Cmd)) |> binops)
             <|> block
 
     let parse_toplevel_stmt =

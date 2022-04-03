@@ -14,13 +14,13 @@ module Runtime =
 
     let private error ex message = failwithf "%O : %s" ex message
 
-    let rec do_stmt (stmt: Stmt) (ctx: Context) : Context =
+    let rec do_stmt (stmt: Stmt) (ctx: Context) (echo: bool) : Context =
         match stmt with
         | Stmt.Decl (name, ex) -> ctx.WithVar(name, eval_expr ex ctx)
         | Stmt.Eval ex ->
             match eval_expr ex ctx with
             | Val.Nil -> ()
-            | x -> sprintf "%O" x |> ctx.WriteLine
+            | x -> if echo then sprintf "%O" x |> ctx.WriteLine
             ctx
         | Stmt.Help (Some command) ->
             match ctx.Vars.TryFind command with
@@ -90,7 +90,7 @@ module Runtime =
             let rec loop stmts ctx =
                 match stmts with
                 | [] -> ctx
-                | stmt :: xs -> loop xs (do_stmt stmt ctx)
+                | stmt :: xs -> loop xs (do_stmt stmt ctx false)
             eval_expr ex (loop stmts ctx)
         | Expr.Cmd (id, args) ->
             match ctx.Vars.TryFind id with

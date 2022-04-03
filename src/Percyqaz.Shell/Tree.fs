@@ -130,7 +130,7 @@ module Tree =
             | Cond (_, basecase) -> sprintf "if ... else %O" basecase
             
             | Block (_, ex) -> sprintf "{ ... ; %O }" ex
-            | Cmd (id, _) -> sprintf "%s ..." id
+            | Cmd (id, _) -> id
             | VarCall (ex, _) -> sprintf "%O(...)" ex
 
     and [<RequireQualifiedAccess>] Stmt =

@@ -25,7 +25,7 @@ module Shell =
             | Failure (_, err, _) -> ParseFail err
 
         member this.Interpret(stmt: Stmt) : ShellResult<Context> =
-            try do_stmt stmt this |> Ok
+            try do_stmt stmt this true |> Ok
             with err -> RunFail err
 
         member this.Interpret(query: string) : ShellResult<Context> =
@@ -73,7 +73,7 @@ module Shell =
         let mutable ctx = ctx
         while true do 
             printf "> "
-            match ctx.Interpret(ctx.ReadLine()) with
+            match ctx.Interpret(ctx.ReadLine().Trim()) with
             | Ok c -> ctx <- c
             | ParseFail err -> printfn "%O" err
             | RunFail exn -> printfn "%s" exn.Message
