@@ -16,6 +16,9 @@ module Types =
 
         let unexpected x message = failwith ""
 
+    let any : Type<Val> =
+        create "Any" id id
+
     let bool : Type<bool> =
         create "Boolean"
             (function Val.Bool b -> b | x -> unexpected x "Expected a boolean")

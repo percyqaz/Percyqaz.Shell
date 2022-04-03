@@ -100,6 +100,13 @@ module Parser =
 
         let brackets = between (pchar '(' .>> spaces) (spaces >>. pchar ')') parse_expr_ext
 
+        let lambda =
+              let sep = spaces >>. pchar ',' >>. spaces
+              tuple2
+                  (pchar '|' >>. spaces >>. sepBy ident sep .>> spaces .>> pchar '|')
+                  (spaces >>. pstring "->" >>. spaces >>. parse_expr_ext)
+              |>> Expr.Func
+
         let binops expr_parser =
 
             let rec binop ops p left =
@@ -136,7 +143,7 @@ module Parser =
             |>> Expr.Block
 
         parse_exprR := 
-            choiceL [attempt var; cond; pipe_input; monop; parse_val_expr; brackets] "Expression"
+            choiceL [attempt var; cond; pipe_input; monop; lambda; parse_val_expr; brackets] "Expression"
             >>= suffixes
 
         parse_expr_extR := 

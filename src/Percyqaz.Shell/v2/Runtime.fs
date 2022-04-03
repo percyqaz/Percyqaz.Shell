@@ -26,7 +26,7 @@ module Runtime =
         | Expr.Nil -> Val.Nil
         | Expr.Obj xs -> Map.map (fun _ ex -> eval_expr ex ctx) xs |> Val.Obj
         | Expr.Arr xs -> List.map (fun ex -> eval_expr ex ctx) xs |> Val.Arr
-        | Expr.Func (binds, body) -> error ex "Not yet implemented"
+        | Expr.Func (binds, body) -> construct_lambda binds body ctx
         
         | Expr.Monop (op, ex) -> eval_monop op ex ctx
         | Expr.Binop (op, left, right) -> eval_binop op left right ctx
@@ -76,10 +76,14 @@ module Runtime =
                 | [] -> ctx
                 | stmt :: xs -> loop xs (do_stmt stmt ctx)
             eval_expr ex (loop stmts ctx)
-        | Expr.Cmd _ -> error ex "Not yet implemented"
+        | Expr.Cmd (id, args) ->
+            match ctx.Vars.TryFind id with
+            | Some (Val.Func f) -> f.Impl (List.map (fun ex -> eval_expr ex ctx) args)
+            | Some _ -> error ex "Value is not callable"
+            | None -> error ex "No such command"
         | Expr.VarCall (main, args) ->
             match eval_expr main ctx with
-            | Val.Func _ -> error ex "Not yet implemented"
+            | Val.Func f -> f.Impl (List.map (fun ex -> eval_expr ex ctx) args)
             | _ -> error ex "Value is not callable"
 
     and eval_monop (op: Monop) (ex: Expr) (ctx: Context) : Val =
@@ -93,7 +97,7 @@ module Runtime =
             | Val.Num n -> n <> 0
             | Val.Bool b -> b
             | Val.Nil -> false
-            | Val.Arr xs -> xs <> []
+            | Val.Arr xs -> not xs.IsEmpty
             | Val.Obj xs -> error ex "Cannot cast object to bool"
             | Val.Func _ -> error ex "Cannot cast function to bool"
             |> Val.Bool
@@ -141,3 +145,19 @@ module Runtime =
         | Binop.SUB -> numop (-)
         | Binop.MUL -> numop (*)
         | Binop.DIV -> numop (/)
+
+    and construct_lambda (binds: string list) (body: Expr) (ctx: Context) : Val =
+        {
+            Binds = binds |> List.map (fun x -> (x, Types.any.Box))
+            Desc = "Anonymous function"
+            Impl =
+                let c = binds.Length
+                fun xs ->
+                    if xs.Length <> c then
+                        failwithf "Expected %i arguments" c
+                    else
+                        let mutable ctx = ctx
+                        for (name, v) in List.zip binds xs do
+                            ctx <- ctx.WithVar(name, v)
+                        eval_expr body ctx
+        } |> Val.Func

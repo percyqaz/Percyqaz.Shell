@@ -10,6 +10,29 @@ module Tree =
             Up: Val -> 'T
             Down: 'T -> Val
         }
+        member this.Box : Type<obj> =
+            {
+                Name = this.Name
+                Up = this.Up >> box
+                Down = unbox >> this.Down
+            }
+        member this.Unbox<'T>() : Type<'T> =
+            {
+                Name = this.Name
+                Up = unbox this.Up
+                Down = unbox this.Down
+            }
+
+    and Type = Type<obj>
+
+    and Func =
+        {
+            // For documentation/help purposes
+            Binds: (string * Type) list
+            Desc: string
+            // Only this implementation matters
+            Impl: Val list -> Val
+        }
     
     and [<RequireQualifiedAccess>] Val =
         | Str of string
@@ -19,7 +42,7 @@ module Tree =
 
         | Obj of Map<string, Val>
         | Arr of Val list
-        | Func of binds: string list * body: Expr * ctx: Context
+        | Func of Func
         override this.ToString() =
             match this with
             | Str s -> s
@@ -37,7 +60,7 @@ module Tree =
                 "[" + 
                 ( xs |> List.map (sprintf "%O") |> String.concat ", " )
                 + "]"
-            | Func _ -> "<func>"
+            | Func f -> sprintf "<function of arity %i>" f.Binds.Length
 
     and [<RequireQualifiedAccess>] Monop =
         | ECHO
