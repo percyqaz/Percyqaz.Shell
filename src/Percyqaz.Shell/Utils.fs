@@ -1,4 +1,4 @@
-﻿namespace Percyqaz.Shell.v2
+﻿namespace Percyqaz.Shell
 
 open Tree
 
@@ -62,22 +62,22 @@ module Types =
             (Array.toList >> List.map ty.Down >> Val.Arr)
 
 
-type private Impl = Val list -> Val
+type private _Impl = Val list -> Val
 
-type Command =
+type Impl =
     
-    static member Create(f: unit -> 'T, ret: Type<'T>) : Impl =
+    static member Create(f: unit -> 'T, ret: Type<'T>) : _Impl =
         fun xs ->
             if xs.Length <> 0 then failwith "Expected 0 arguments"
             else ret.Down (f())
 
-    static member Create(f: unit -> unit) = Command.Create(f, Types.nil)
+    static member Create(f: unit -> unit) = Impl.Create(f, Types.nil)
     
     static member Create(
         a1: Type<'A>,
         f: 'A -> 'T,
         ret: Type<'T>
-        ) : Impl =
+        ) : _Impl =
         fun xs ->
             match xs with
             | a :: [] -> f (a1.Up a) |> ret.Down
@@ -86,14 +86,14 @@ type Command =
     static member Create(
         a1: Type<'A>,
         f: 'A -> unit
-        ) = Command.Create(a1, f, Types.nil)
+        ) = Impl.Create(a1, f, Types.nil)
     
     static member Create(
         a1: Type<'A>,
         a2: Type<'B>,
         f: 'A -> 'B -> 'T,
         ret: Type<'T>
-        ) : Impl =
+        ) : _Impl =
         fun xs ->
             match xs with
             | a :: b :: [] -> f (a1.Up a) (a2.Up b) |> ret.Down
@@ -103,7 +103,7 @@ type Command =
         a1: Type<'A>,
         a2: Type<'B>,
         f: 'A -> 'B -> unit
-        ) = Command.Create(a1, a2, f, Types.nil)
+        ) = Impl.Create(a1, a2, f, Types.nil)
     
     static member Create(
         a1: Type<'A>,
@@ -111,7 +111,7 @@ type Command =
         a3: Type<'C>,
         f: 'A -> 'B -> 'C -> 'T,
         ret: Type<'T>
-        ) : Impl =
+        ) : _Impl =
         fun xs ->
             match xs with
             | a :: b :: c :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) |> ret.Down
@@ -122,7 +122,7 @@ type Command =
         a2: Type<'B>,
         a3: Type<'C>,
         f: 'A -> 'B -> 'C -> unit
-        ) = Command.Create(a1, a2, a3, f, Types.nil)
+        ) = Impl.Create(a1, a2, a3, f, Types.nil)
     
     static member Create(
         a1: Type<'A>,
@@ -131,7 +131,7 @@ type Command =
         a4: Type<'D>,
         f: 'A -> 'B -> 'C -> 'D -> 'T,
         ret: Type<'T>
-        ) : Impl =
+        ) : _Impl =
         fun xs ->
             match xs with
             | a :: b :: c :: d :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) |> ret.Down
@@ -143,7 +143,7 @@ type Command =
         a3: Type<'C>,
         a4: Type<'D>,
         f: 'A -> 'B -> 'C -> 'D -> unit
-        ) = Command.Create(a1, a2, a3, a4, f, Types.nil)
+        ) = Impl.Create(a1, a2, a3, a4, f, Types.nil)
         
     static member Create(
         a1: Type<'A>,
@@ -153,7 +153,7 @@ type Command =
         a5: Type<'E>,
         f: 'A -> 'B -> 'C -> 'D -> 'E -> 'T,
         ret: Type<'T>
-        ) : Impl =
+        ) : _Impl =
         fun xs ->
             match xs with
             | a :: b :: c :: d :: e :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) (a5.Up e) |> ret.Down
@@ -166,7 +166,7 @@ type Command =
         a4: Type<'D>,
         a5: Type<'E>,
         f: 'A -> 'B -> 'C -> 'D -> 'E -> unit
-        ) : Impl = Command.Create(a1, a2, a3, a4, a5, f, Types.nil)
+        ) : _Impl = Impl.Create(a1, a2, a3, a4, a5, f, Types.nil)
 
 module Command =
 

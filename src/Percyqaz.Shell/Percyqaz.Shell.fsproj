@@ -6,7 +6,7 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <Version>0.1.1</Version>
+    <Version>0.2.0</Version>
 	<RepositoryUrl>https://github.com/percyqaz/Percyqaz.Shell/</RepositoryUrl>
   </PropertyGroup>
 
@@ -16,21 +16,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="v2\Tree.fs" />
-    <Compile Include="v2\Runtime.fs" />
-    <Compile Include="v2\Parser.fs" />
-    <Compile Include="v2\Utils.fs" />
-    <Compile Include="v2\Library.fs" />
+    <EmbeddedResource Remove="v1\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="Tree.fs" />
+    <Compile Include="Runtime.fs" />
     <Compile Include="Parser.fs" />
-    <Compile Include="Check.fs" />
-    <Compile Include="Interop.fs" />
+    <Compile Include="Utils.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FParsec" Version="1.1.1" />
-    <PackageReference Include="Percyqaz.Json" Version="2.0.2" />
   </ItemGroup>
 
 </Project>

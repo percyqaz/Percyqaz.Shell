@@ -1,162 +1,144 @@
-﻿namespace Percyqaz.Shell.deprecated
+﻿namespace Percyqaz.Shell
 
 open System
 
-module rec Tree =
+module Tree =
 
-    /// Types. These are constraints on Values to ensure a command is getting only the kind of data it expects
-    /// For example, a command that opens a file would only want to take Strings since a file name cannot be an Array
-    /// These types are checked before dispatch to prevent such logic errors
-    [<RequireQualifiedAccess>]
-    type Type =
-        | Any
-        | String
-        | Bool
-        | Number
-        | Null
-        | Object of Map<string, Type>
-        | Array of Type
-        | Fn of CommandSignature
-        override this.ToString() =
-            match this with
-            | Any -> "any"
-            | String -> "str"
-            | Bool -> "bool"
-            | Number -> "num"
-            | Null -> "null"
-            | Object ms -> 
-                "{ " + 
-                ( Map.toSeq ms
-                |> Seq.map (fun (prop, ty) -> sprintf "%s: %O" prop ty)
-                |> String.concat "; " )
-                + " }"
-            | Array ty -> sprintf "array of %O" ty
-            | Fn sgn ->
-                ( sgn.Args
-                |> Seq.map (fun (arg, ty) -> sprintf "%O -> " ty)
-                |> String.concat "" )
-                + 
-                ( sgn.OptArgs
-                |> Seq.map (fun (arg, ty) -> sprintf "?%O -> " ty)
-                |> String.concat "" )
-                +
-                ( sgn.Flags |> Map.toSeq
-                |> Seq.map (fun (flag, ty) -> sprintf "#%s: %O -> " flag ty)
-                |> String.concat "" )
-                + sgn.ReturnType.ToString()
-
-    /// Values. These are the key building block of the shell
-    /// All data is represented by these values
-    [<RequireQualifiedAccess>]
-    type Val =
-        | String of string
-        | Number of float
+    type Func =
+        {
+            // For documentation/help purposes
+            Binds: string list
+            Desc: string
+            // Only this implementation matters
+            Impl: Val list -> Val
+        }
+    
+    and [<RequireQualifiedAccess>] Val =
+        | Str of string
+        | Num of float
         | Bool of bool
-        | Null
-        | Object of Map<string, Val>
-        | Array of Val list
-        | Lambda of signature: CommandSignature * body: ExprC * context: Context
+        | Nil
+
+        | Obj of Map<string, Val>
+        | Arr of Val list
+        | Func of Func
         override this.ToString() =
             match this with
-            | String s -> sprintf "%A" s
-            | Bool b -> sprintf "%b" b
-            | Number n -> sprintf "%O" n
-            | Object ms -> 
+            | Str s -> s
+            | Num n -> sprintf "%O" n
+            | Bool b -> if b then "True" else "False"
+            | Nil -> "Nil"
+
+            | Obj ms -> 
                 "{ " + 
                 ( Map.toSeq ms
                 |> Seq.map (fun (prop, v) -> sprintf "%s: %O" prop v)
                 |> String.concat ", " )
                 + " }"
-            | Array xs ->
-                "[ " + 
+            | Arr xs ->
+                "[" + 
                 ( xs |> List.map (sprintf "%O") |> String.concat ", " )
-                + " ]"
-            | Null -> "null"
-            | Lambda (s, body, ctx) -> sprintf "<lambda of %O>" s
+                + "]"
+            | Func f -> sprintf "<function of arity %i>" f.Binds.Length
 
-    /// Signature for a command, specifying what arguments and flags it takes
-    type CommandSignature =
-        {
-            Args: (string * Type) list
-            OptArgs: (string * Type) list
-            Flags: Map<string, Type>
-            ReturnType: Type
-        }
+    and [<RequireQualifiedAccess>] Monop =
+        | ECHO
+        | STR
+        | TRUTH
+        | NOT
+        | NEG
+        | ROUND
+        override this.ToString() =
+            match this with
+            | ECHO -> "@:"
+            | STR -> "@"
+            | TRUTH -> "?"
+            | NOT -> "!"
+            | NEG -> "-"
+            | ROUND -> "~"
 
-    [<AutoOpen>]
-    module Syntax =
+    and [<RequireQualifiedAccess>] Binop =
+        | OR
+        | PIPE
+        | AND
+        | ADD
+        | SUB
+        | MUL
+        | DIV
+        override this.ToString() =
+            match this with
+            | OR -> "||"
+            | PIPE -> "|"
+            | AND -> "&&"
+            | ADD -> "+"
+            | SUB -> "-"
+            | MUL -> "*"
+            | DIV -> "/"
+        
+    and [<RequireQualifiedAccess>] StrFrag =
+        | Ex of Expr
+        | Str of string
 
-        /// Expression representations. These are evaluated to Vals during resolution
-        type [<RequireQualifiedAccess>] Expr =
-            | String of string
-            | Number of float
-            | Bool of bool
-            | Null
-            | Object of Map<string, Expr>
-            | Array of Expr list
-            | Lambda of binds: (string * Type) list * returnType: Type option * body: Expr
+    and [<RequireQualifiedAccess>] Expr =
+        | Str of string
+        | StrInterp of StrFrag list
+        | Num of float
+        | Bool of bool
+        | Nil
+        | Obj of Map<string, Expr>
+        | Arr of Expr list
+        | Func of binds: string list * body: Expr
 
-            | Pipeline of Expr * rest: Expr
-            | Pipeline_Variable
-            | Variable of string
-            | Subscript of main: Expr * sub: Expr
-            | Property of main: Expr * prop: string
-            | Command of CommandRequest
-            | Cond of arms: (Expr * Expr) list * basecase: Expr
-            | Try of Expr * iferror: Expr
-            | Block of Statement list * Expr
-            | Call_Lambda of Expr * args: Expr list * flags: Map<string, Expr>
+        | Monop of op: Monop * ex: Expr
+        | Binop of op: Binop * left: Expr * right: Expr
+        | Pipevar
+        | Var of string
+        | Sub of main: Expr * sub: Expr
+        | Prop of main: Expr * prop: string
+        | Cond of arms: (Expr * Expr) list * basecase: Expr
 
-        /// Enumeration of possible top-level actions a shell can provide
-        type [<RequireQualifiedAccess>] Statement =
-            | Declare of string * Type option * Expr
-            | Eval of Expr
-            | Help of string option
+        | Block of Stmt list * Expr
+        | Cmd of id: string * args: Expr list
+        | VarCall of Expr * args: Expr list
+        override this.ToString() =
+            match this with
+            | Str s -> sprintf "%A" s
+            | StrInterp xs ->
+                List.map (function StrFrag.Ex ex -> sprintf "{%O}" ex | StrFrag.Str s -> s) xs
+                |> String.concat "" |> sprintf "%A"
+            | Num n -> n.ToString() // culture invariant
+            | Bool b -> if b then "True" else "False"
+            | Nil -> "Nil"
+            | Obj ms -> 
+                "{ " + 
+                ( Map.toSeq ms
+                |> Seq.map (fun (prop, v) -> sprintf "%s: %O" prop v)
+                |> String.concat ", " )
+                + " }"
+            | Arr xs ->
+                "[" + 
+                ( xs |> List.map (sprintf "%O") |> String.concat ", " )
+                + "]"
+            | Func (binds, _) -> binds |> String.concat ", " |> sprintf "|%s| -> ..."
 
-        /// An command call, containing expressions as arguments
-        type CommandRequest =
-            {
-                Name: string
-                Args: Expr list
-                Flags: Map<string, Expr>
-            }
+            | Monop (op, ex) -> sprintf "%O%O" op ex
+            | Binop (op, left, right) -> sprintf "(%O %O %O)" left op right
+            | Pipevar -> "$"
+            | Var v -> sprintf "$%s" v
+            | Sub (main, sub) -> sprintf "%O[%O]" main sub
+            | Prop (main, prop) -> sprintf "%O.%s" main prop
+            | Cond (_, basecase) -> sprintf "if ... else %O" basecase
+            
+            | Block (_, ex) -> sprintf "{ ... ; %O }" ex
+            | Cmd (id, _) -> sprintf "%s ..." id
+            | VarCall (ex, _) -> sprintf "%O(...)" ex
 
-    [<AutoOpen>]
-    module Checked =
+    and [<RequireQualifiedAccess>] Stmt =
+        | Decl of string * Expr
+        | Eval of Expr
+        | Help of string option
 
-        type [<RequireQualifiedAccess>] ExprC =
-            | String of string
-            | Number of float
-            | Bool of bool
-            | Null
-            | Object of Map<string, ExprC>
-            | Array of ExprC list
-            | Lambda of binds: (string * Type) list * returnType: Type * body: ExprC
-
-            | Pipeline of ExprC * rest: ExprC
-            | Pipeline_Variable
-            | Variable of string
-            | Subscript of main: ExprC * sub: ExprC
-            | Property of main: ExprC * prop: string
-            | Command of CommandRequestC
-            | Cond of arms: (ExprC * ExprC) list * basecase: ExprC
-            | Try of ExprC * iferror: ExprC
-            | Block of StatementC list * ExprC
-            | Call_Lambda of ExprC * args: ExprC list * flags: Map<string, ExprC>
-
-        type [<RequireQualifiedAccess>] StatementC =
-            | Declare of string * Type * ExprC
-            | Eval of ExprC
-            | Help of string option
-
-        type CommandRequestC =
-            {
-                Name: string
-                Args: ExprC list
-                Flags: Map<string, ExprC>
-            }
-
-    type IOContext =
+    and IOContext =
         {
             In: IO.TextReader
             Out: IO.TextWriter
@@ -167,35 +149,20 @@ module rec Tree =
                 Out = Console.Out
             }
 
-    type CommandExecutionContext =
+    and Context =
         {
-            Args: Val list
-            Flags: Map<string, Val>
-            IOContext: IOContext
-        }
-
-    type CommandInfo =
-        {
-            Signature: CommandSignature
-            Implementation: CommandExecutionContext -> Val
-        }
-    
-    type Context =
-        {
-            Variables: Map<string, Type * Val>
-            Commands: Map<string, CommandInfo>
+            Vars: Map<string, Val>
             IO: IOContext
         }
         static member Empty =
             {
-                Variables = Map.empty
-                Commands = Map.empty
+                Vars = Map.empty
                 IO = IOContext.Default
             }
         member this.Write(str: string) = this.IO.Out.Write(str)
         member this.WriteLine(str: string) = this.IO.Out.WriteLine(str)
         member this.ReadLine() : string = this.IO.In.ReadLine()
-        member this.WithPipelineType(ty: Type) = { this with Variables = Map.add "" (ty, Val.Null) this.Variables }
-        member this.WithPipelineValue(value: Val) = { this with Variables = Map.add "" (Type.Any, value) this.Variables }
-        member this.WithVarType(name: string, ty: Type) = { this with Variables = Map.add name (ty, Val.Null) this.Variables }
-        member this.WithVar(name: string, value: Val, ty: Type) = { this with Variables = Map.add name (ty, value) this.Variables }
+        
+        member this.WithVar(name: string, value: Val) = { this with Vars = Map.add name value this.Vars }
+        member this.WithPipeVar(value: Val) = this.WithVar("", value)
+        member this.WithCommand(name: string, func: Func) = this.WithVar(name, Val.Func func)

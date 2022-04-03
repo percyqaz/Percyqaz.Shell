@@ -1,8 +1,16 @@
-﻿namespace Percyqaz.Shell.v2
+﻿namespace Percyqaz.Shell
 
 module Runtime =
     
     open Tree
+
+    let show_command (ctx: Context) (name: string) (func: Func) =
+        ctx.WriteLine(sprintf "Showing help for '%s':\n" name)
+    
+        ctx.Write("usage: " + name)
+        for arg in func.Binds do
+            ctx.Write(sprintf " <%s>" arg)
+        ctx.WriteLine("\n" + func.Desc)
 
     let private error ex message = failwithf "%O : %s" ex message
 
@@ -14,8 +22,16 @@ module Runtime =
             | Val.Nil -> ()
             | x -> sprintf "%O" x |> ctx.WriteLine
             ctx
-        | Stmt.Help (Some command) -> failwith "Not yet implemented"
-        | Stmt.Help None -> failwith "Not yet implemented"
+        | Stmt.Help (Some command) ->
+            match ctx.Vars.TryFind command with
+            | Some (Val.Func f) -> show_command ctx command f
+            | Some (_) -> failwith "This is a variable, not a command"
+            | None -> failwith "No such command"
+            ctx
+        | Stmt.Help None ->
+            let commands = ctx.Vars |> Map.filter (fun _ -> function Val.Func _ -> true | _ -> false) |> Map.keys
+            ctx.WriteLine(sprintf "Available commands: %s" (String.concat ", " commands))
+            ctx
 
     and eval_expr (ex: Expr) (ctx: Context) : Val =
         match ex with
