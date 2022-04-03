@@ -148,7 +148,7 @@ module Runtime =
 
     and construct_lambda (binds: string list) (body: Expr) (ctx: Context) : Val =
         {
-            Binds = binds |> List.map (fun x -> (x, Types.any.Box))
+            Binds = binds
             Desc = "Anonymous function"
             Impl =
                 let c = binds.Length

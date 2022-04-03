@@ -4,31 +4,10 @@ open System
 
 module Tree =
 
-    type Type<'T> =
-        {
-            Name: string
-            Up: Val -> 'T
-            Down: 'T -> Val
-        }
-        member this.Box : Type<obj> =
-            {
-                Name = this.Name
-                Up = this.Up >> box
-                Down = unbox >> this.Down
-            }
-        member this.Unbox<'T>() : Type<'T> =
-            {
-                Name = this.Name
-                Up = unbox this.Up
-                Down = unbox this.Down
-            }
-
-    and Type = Type<obj>
-
-    and Func =
+    type Func =
         {
             // For documentation/help purposes
-            Binds: (string * Type) list
+            Binds: string list
             Desc: string
             // Only this implementation matters
             Impl: Val list -> Val
@@ -184,5 +163,6 @@ module Tree =
         member this.WriteLine(str: string) = this.IO.Out.WriteLine(str)
         member this.ReadLine() : string = this.IO.In.ReadLine()
         
-        member this.WithPipeVar(value: Val) = { this with Vars = Map.add "" value this.Vars }
         member this.WithVar(name: string, value: Val) = { this with Vars = Map.add name value this.Vars }
+        member this.WithPipeVar(value: Val) = this.WithVar("", value)
+        member this.WithCommand(name: string, func: Func) = this.WithVar(name, Val.Func func)

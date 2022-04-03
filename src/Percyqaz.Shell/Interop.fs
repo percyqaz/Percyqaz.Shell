@@ -1,4 +1,4 @@
-﻿namespace Percyqaz.Shell
+﻿namespace Percyqaz.Shell.deprecated
 
 open System
 open Tree

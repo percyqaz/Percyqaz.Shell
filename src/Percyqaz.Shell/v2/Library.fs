@@ -1,17 +1,17 @@
-﻿namespace Percyqaz.Shell.v2
+﻿namespace Percyqaz.Shell
 
 open System
 open FParsec
-open Tree
-open Runtime
-open Parser
+open Percyqaz.Shell.v2.Tree
+open Percyqaz.Shell.v2.Runtime
+open Percyqaz.Shell.v2.Parser
 
 type ShellResult<'T> =
     | Ok of 'T
     | ParseFail of ParserError
     | RunFail of Exception
 
-module Library =
+module Shell =
 
     type Context with
 
@@ -33,48 +33,47 @@ module Library =
             | Success (res, _, _) -> this.Interpret res
             | Failure (_, err, _) -> ParseFail err
 
-    module Interface =
-        open System.IO
-        open System.IO.Pipes
+    open System.IO
+    open System.IO.Pipes
 
-        let serve (id: string) (ctx: Context) =
-            use server = new NamedPipeServerStream(id)
+    let serve (id: string) (ctx: Context) =
+        use server = new NamedPipeServerStream(id)
 
-            while true do
-                server.WaitForConnection()
+        while true do
+            server.WaitForConnection()
 
-                let reader = new StreamReader(server)
-                let writer = new StreamWriter(server)
+            let reader = new StreamReader(server)
+            let writer = new StreamWriter(server)
 
-                let ctx = { ctx with IO = { In = reader; Out = writer } }
+            let ctx = { ctx with IO = { In = reader; Out = writer } }
 
-                match ctx.Interpret(ctx.ReadLine()) with
-                | Ok c -> ()
-                | ParseFail err -> ctx.WriteLine (sprintf "%O" err.Messages.Head)
-                | RunFail exn -> ctx.WriteLine (sprintf "%s" exn.Message)
+            match ctx.Interpret(ctx.ReadLine()) with
+            | Ok c -> ()
+            | ParseFail err -> ctx.WriteLine (sprintf "%O" err.Messages.Head)
+            | RunFail exn -> ctx.WriteLine (sprintf "%s" exn.Message)
             
-                writer.Flush()
-
-                server.Disconnect()
-
-        let connect (id: string) (query: string) =
-            use client = new NamedPipeClientStream(id)
-
-            client.Connect(1000)
-        
-            let reader = new StreamReader(client)
-            let writer = new StreamWriter(client)
-
-            writer.WriteLine query
             writer.Flush()
 
-            printfn "%s" (reader.ReadToEnd())
+            server.Disconnect()
 
-        let basic_repl<'T>() =
-            let mutable ctx = Context.Empty //
-            while true do 
-                printf "> "
-                match ctx.Interpret(ctx.ReadLine()) with
-                | Ok c -> ctx <- c
-                | ParseFail err -> printfn "%O" err
-                | RunFail exn -> printfn "%s" exn.Message
+    let connect (id: string) (query: string) =
+        use client = new NamedPipeClientStream(id)
+
+        client.Connect(1000)
+        
+        let reader = new StreamReader(client)
+        let writer = new StreamWriter(client)
+
+        writer.WriteLine query
+        writer.Flush()
+
+        printfn "%s" (reader.ReadToEnd())
+
+    let basic_repl() =
+        let mutable ctx = Context.Empty
+        while true do 
+            printf "> "
+            match ctx.Interpret(ctx.ReadLine()) with
+            | Ok c -> ctx <- c
+            | ParseFail err -> printfn "%O" err
+            | RunFail exn -> printfn "%s" exn.Message

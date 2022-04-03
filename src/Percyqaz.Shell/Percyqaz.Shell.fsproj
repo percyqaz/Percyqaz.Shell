@@ -17,9 +17,9 @@
 
   <ItemGroup>
     <Compile Include="v2\Tree.fs" />
-    <Compile Include="v2\Types.fs" />
     <Compile Include="v2\Runtime.fs" />
     <Compile Include="v2\Parser.fs" />
+    <Compile Include="v2\Utils.fs" />
     <Compile Include="v2\Library.fs" />
     <Compile Include="Tree.fs" />
     <Compile Include="Parser.fs" />

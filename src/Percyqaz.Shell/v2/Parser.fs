@@ -47,8 +47,8 @@ module Parser =
         let jstring = stringLiteral |>> Expr.Str
         let listBetweenStrings sOpen sClose pElement f =
             between (pstring sOpen) (pstring sClose) (ws >>. sepBy (pElement .>> ws) (pstring "," >>. ws) |>> f)
-        let jlist = listBetweenStrings "[" "]" parse_expr Expr.Arr
-        let keyValue = (stringLiteral <|> ident) .>>. (ws >>. pstring ":" >>. ws >>. parse_expr)
+        let jlist = listBetweenStrings "[" "]" parse_expr_ext Expr.Arr
+        let keyValue = (stringLiteral <|> ident) .>>. (ws >>. pstring ":" >>. ws >>. parse_expr_ext)
         let jobject = listBetweenStrings "{" "}" keyValue (Map.ofList >> Expr.Obj)
 
         parse_val_exprR := choiceL [jobject; jlist; jstring; jnumber; jtrue; jfalse; jnull] "Value"
