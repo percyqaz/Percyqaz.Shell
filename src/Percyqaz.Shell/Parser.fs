@@ -43,6 +43,13 @@ module Parser =
             |>> System.Double.TryParse
             |>> fun (s, v) -> Expr.Num v
 
+        let strinterp =
+            let frag : Parser<StrFrag, unit> =
+                attempt(many1CharsTill (noneOf "`{") (followedBy (pchar '`' <|> pchar '{')) |>> StrFrag.Str)
+                <|> attempt (pstring "{{" >>% StrFrag.Str "{")
+                <|> (between (pchar '{') (pchar '}') parse_expr_ext |>> StrFrag.Ex)
+            between (pchar '`') (pchar '`') (many frag) |>> Expr.StrInterp
+
         let ws = spaces
         let jstring = stringLiteral |>> Expr.Str
         let listBetweenStrings sOpen sClose pElement f =
@@ -51,7 +58,7 @@ module Parser =
         let keyValue = (stringLiteral <|> ident) .>>. (ws >>. pstring ":" >>. ws >>. parse_expr_ext)
         let jobject = listBetweenStrings "{" "}" keyValue (Map.ofList >> Expr.Obj)
 
-        parse_val_exprR := choiceL [jobject; jlist; jstring; jnumber; jtrue; jfalse; jnull] "Value"
+        parse_val_exprR := choiceL [jobject; jlist; jstring; strinterp; jnumber; jtrue; jfalse; jnull] "Value"
 
     type private Suffix =
         | Prop of string

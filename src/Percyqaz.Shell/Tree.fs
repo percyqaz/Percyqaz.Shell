@@ -108,7 +108,7 @@ module Tree =
             | StrInterp xs ->
                 List.map (function StrFrag.Ex ex -> sprintf "{%O}" ex | StrFrag.Str s -> s) xs
                 |> String.concat "" |> sprintf "%A"
-            | Num n -> n.ToString() // culture invariant
+            | Num n -> n.ToString() // todo: culture invariant
             | Bool b -> if b then "True" else "False"
             | Nil -> "Nil"
             | Obj ms -> 

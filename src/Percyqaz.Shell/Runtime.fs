@@ -51,7 +51,10 @@ module Runtime =
     and eval_expr (ex: Expr) (ctx: Context) : Val =
         match ex with
         | Expr.Str lit -> Val.Str lit
-        | Expr.StrInterp frags -> error ex "Not yet implemented"
+        | Expr.StrInterp frags ->
+            List.map (function StrFrag.Str s -> s | StrFrag.Ex x -> (eval_expr x ctx).ToString()) frags
+            |> String.concat ""
+            |> Val.Str
         | Expr.Num n -> Val.Num n
         | Expr.Bool b -> Val.Bool b
         | Expr.Nil -> Val.Nil
