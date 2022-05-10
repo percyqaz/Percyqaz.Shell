@@ -45,7 +45,9 @@ module Runtime =
             ctx
         | Stmt.Help_All ->
             let commands = ctx.Vars |> Map.filter (fun _ -> function Val.Func _ -> true | _ -> false) |> Map.keys
+            let modules = ctx.Modules |> Map.keys
             ctx.WriteLine(sprintf "Available commands: %s" (String.concat ", " commands))
+            ctx.WriteLine(sprintf "Available modules: %s" (String.concat ", " modules))
             ctx
 
     and eval_expr (ex: Expr) (ctx: Context) : Val =
