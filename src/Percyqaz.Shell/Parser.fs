@@ -164,7 +164,7 @@ module Parser =
     let parse_toplevel_stmt =
         
         let help = 
-            attempt (pstring "help" >>. spaces1 >>. (ident >>. pstring "::" .>>. ident) |>> Stmt.Help_ModuleCmd)
+            attempt (pstring "help" >>. spaces1 >>. (ident .>> pstring "::" .>>. ident) |>> Stmt.Help_ModuleCmd)
             <|> attempt (pstring "help" >>. spaces1 >>. ident |>> Stmt.Help_ModuleOrCmd)
             <|> (pstring "help" >>% Stmt.Help_All)
 

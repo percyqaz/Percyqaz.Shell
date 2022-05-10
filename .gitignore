@@ -10,3 +10,5 @@
 /src/Percyqaz.Shell.Examples/obj
 /src/Percyqaz.Shell/nuget.config
 .vscode/settings.json
+
+.fake
