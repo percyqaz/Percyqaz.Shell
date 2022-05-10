@@ -108,7 +108,7 @@ module Tree =
             | StrInterp xs ->
                 List.map (function StrFrag.Ex ex -> sprintf "{%O}" ex | StrFrag.Str s -> s) xs
                 |> String.concat "" |> sprintf "%A"
-            | Num n -> n.ToString() // todo: culture invariant
+            | Num n -> n.ToString(Globalization.CultureInfo.InvariantCulture)
             | Bool b -> if b then "True" else "False"
             | Nil -> "Nil"
             | Obj ms -> 
@@ -155,7 +155,13 @@ module Tree =
                 Out = Console.Out
             }
 
-    and Module = Map<string, Val>
+    and Module = 
+        { 
+            Vars: Map<string, Val>
+        }
+        static member Empty = { Vars = Map.empty }
+        member this.WithVar(name: string, value: Val) = { this with Vars = Map.add name value this.Vars }
+        member this.WithCommand(name: string, func: Func) = this.WithVar(name, Val.Func func)
 
     and Context =
         {
@@ -176,3 +182,4 @@ module Tree =
         member this.WithVar(name: string, value: Val) = { this with Vars = Map.add name value this.Vars }
         member this.WithPipeVar(value: Val) = this.WithVar("", value)
         member this.WithCommand(name: string, func: Func) = this.WithVar(name, Val.Func func)
+        member this.WithModule(name: string, m: Module) = { this with Modules = Map.add name m this.Modules }

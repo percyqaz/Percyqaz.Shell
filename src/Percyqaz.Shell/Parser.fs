@@ -157,8 +157,9 @@ module Parser =
         let modcmd = ident .>>. (pstring "::" >>. parse_command) |>> fun (m, (id, args)) -> Expr.ModCmd(m, id, args)
 
         parse_expr_extR := 
-            attempt ((lambda <|> parse_expr <|> modcmd <|> cmd) |> binops)
+            attempt ((lambda <|> parse_expr <|> (attempt modcmd) <|> cmd) |> binops)
             <|> block
+            <?> "Expression or command"
 
     let parse_toplevel_stmt =
         
@@ -175,6 +176,6 @@ module Parser =
 
         let eval = parse_expr_ext |>> Stmt.Eval
 
-        do parse_block_stmtR := choiceL [decl; eval] "Statement"
+        do parse_block_stmtR := choiceL [decl; eval] "Block statement"
         
-        choiceL [decl; help; eval] "Statement"
+        choiceL [decl; help; eval] "Top-level statement"

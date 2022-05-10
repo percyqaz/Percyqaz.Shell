@@ -25,7 +25,7 @@ module Runtime =
         | Stmt.Help_ModuleCmd (mname, id) ->
             match ctx.Modules.TryFind mname with
             | Some m ->
-                match m.TryFind id with
+                match m.Vars.TryFind id with
                 | Some (Val.Func f) -> show_command ctx (mname + "::" + id) f
                 | Some (_) -> failwith "This is a variable, not a command"
                 | None -> failwith "No such command"
@@ -39,7 +39,7 @@ module Runtime =
             | None -> command <- false
             match ctx.Modules.TryFind id with
             | Some m ->
-                let commands = m |> Map.filter (fun _ -> function Val.Func _ -> true | _ -> false) |> Map.keys
+                let commands = m.Vars |> Map.filter (fun _ -> function Val.Func _ -> true | _ -> false) |> Map.keys
                 ctx.WriteLine(sprintf "Available commands in module '%s': %s" id (String.concat ", " commands))
             | None -> if not command then failwith "No such command or module"
             ctx
@@ -76,7 +76,7 @@ module Runtime =
             match ctx.Modules.TryFind m with
             | None -> error ex "No such module"
             | Some m ->
-                match Map.tryFind id m with
+                match Map.tryFind id m.Vars with
                 | None -> error ex "No such module variable"
                 | Some v -> v
         | Expr.Sub (main, sub) ->
@@ -126,7 +126,7 @@ module Runtime =
             match ctx.Modules.TryFind m with
             | None -> error ex "No such module"
             | Some m ->
-                match Map.tryFind id m with
+                match Map.tryFind id m.Vars with
                 | Some (Val.Func f) -> f.Impl (List.map (fun ex -> eval_expr ex ctx) args)
                 | Some _ -> error ex "Module value is not callable"
                 | None -> error ex "No such module command"
