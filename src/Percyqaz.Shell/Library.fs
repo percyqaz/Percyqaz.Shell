@@ -33,6 +33,17 @@ module Shell =
             | Success (res, _, _) -> this.Interpret res
             | Failure (_, err, _) -> ParseFail err
 
+        member this.RunScript(script: string) : ShellResult<Context> =
+            match run parse_script script with
+            | Success (res, _, _) ->
+                List.fold 
+                    ( fun state stmt ->
+                        match state with
+                        | Ok ctx -> ctx.Interpret stmt
+                        | _ -> state
+                    ) (Ok this) res
+            | Failure (_, err, _) -> ParseFail err
+
     open System.IO
     open System.IO.Pipes
 

@@ -1,4 +1,5 @@
 ﻿open Percyqaz.Shell
+open Percyqaz.Shell.Shell
 
 let context =
     Context.Empty.WithCommand("sum",
@@ -31,4 +32,15 @@ let context =
             ))
     )
 
-Shell.basic_repl(context)
+context.RunScript
+    """
+        let $x = [5, 6, 7]
+        ; let $y =
+            $x
+            | map (|a| -> $a * $a) $
+            | sum $
+        ; $y + 5
+    """
+|> printfn "%A"
+
+basic_repl(context)

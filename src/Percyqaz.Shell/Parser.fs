@@ -179,3 +179,9 @@ module Parser =
         do parse_block_stmtR := choiceL [decl; eval] "Block statement"
         
         choiceL [decl; help; eval] "Top-level statement"
+
+    let parse_script =
+        spaces >>.
+        sepBy (parse_block_stmt) (attempt (spaces .>> pchar ';' .>> spaces))
+        .>> spaces
+        .>> eof
