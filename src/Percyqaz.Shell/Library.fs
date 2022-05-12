@@ -11,38 +11,41 @@ type ShellResult<'T> =
     | ParseFail of ParserError
     | RunFail of Exception
 
-module Shell =
+[<AutoOpen>]
+module Extensions =
 
     type Context with
-
-        member this.Evaluate(ex: Expr) : ShellResult<Val> =
-            try eval_expr ex this |> Ok
-            with err -> RunFail err
     
-        member this.Evaluate(query: string) : ShellResult<Val> =
-            match run (parse_expr_ext .>> eof) query with
-            | Success (res, _, _) -> this.Evaluate res
-            | Failure (_, err, _) -> ParseFail err
+            member this.Evaluate(ex: Expr) : ShellResult<Val> =
+                try eval_expr ex this |> Ok
+                with err -> RunFail err
+        
+            member this.Evaluate(query: string) : ShellResult<Val> =
+                match run (parse_expr_ext .>> eof) query with
+                | Success (res, _, _) -> this.Evaluate res
+                | Failure (_, err, _) -> ParseFail err
+    
+            member this.Interpret(stmt: Stmt) : ShellResult<Context> =
+                try do_stmt stmt this true |> Ok
+                with err -> RunFail err
+    
+            member this.Interpret(query: string) : ShellResult<Context> =
+                match run (parse_toplevel_stmt .>> eof) query with
+                | Success (res, _, _) -> this.Interpret res
+                | Failure (_, err, _) -> ParseFail err
+    
+            member this.RunScript(script: string) : ShellResult<Context> =
+                match run parse_script script with
+                | Success (res, _, _) ->
+                    List.fold 
+                        ( fun state stmt ->
+                            match state with
+                            | Ok ctx -> ctx.Interpret stmt
+                            | _ -> state
+                        ) (Ok this) res
+                | Failure (_, err, _) -> ParseFail err
 
-        member this.Interpret(stmt: Stmt) : ShellResult<Context> =
-            try do_stmt stmt this true |> Ok
-            with err -> RunFail err
-
-        member this.Interpret(query: string) : ShellResult<Context> =
-            match run (parse_toplevel_stmt .>> eof) query with
-            | Success (res, _, _) -> this.Interpret res
-            | Failure (_, err, _) -> ParseFail err
-
-        member this.RunScript(script: string) : ShellResult<Context> =
-            match run parse_script script with
-            | Success (res, _, _) ->
-                List.fold 
-                    ( fun state stmt ->
-                        match state with
-                        | Ok ctx -> ctx.Interpret stmt
-                        | _ -> state
-                    ) (Ok this) res
-            | Failure (_, err, _) -> ParseFail err
+module Shell =
 
     open System.IO
     open System.IO.Pipes

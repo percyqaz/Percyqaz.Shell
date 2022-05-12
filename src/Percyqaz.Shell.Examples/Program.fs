@@ -1,5 +1,4 @@
 ﻿open Percyqaz.Shell
-open Percyqaz.Shell.Shell
 
 let context =
     Context.Empty.WithCommand("sum",
@@ -43,4 +42,4 @@ context.RunScript
     """
 |> printfn "%A"
 
-basic_repl(context)
+Shell.basic_repl(context)
