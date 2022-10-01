@@ -123,3 +123,43 @@ The pipeline is evaluated from left to right, starting with the original express
 The new result is substituted as `$` next and so on
 
 Very useful for batch processing arrays/general scripty things
+
+### Other constructs
+
+If expressions
+```
+let $obj = { x: True, y: False }
+if $obj.x then 6 elif $obj.y then 7 else 8
+```
+If-expressions are exactly that: expressions. Each "arm" of the if statement is an expression that is returned overall.
+
+They always need an else case (in the future it will probably just treat missing one as `else Nil`)
+
+Block expressions
+```
+{
+    let $x = 100;
+    $x * $x
+}
+```
+Blocks consist of multiple statements like variable declarations, commands, etc, and then finish with an expression which is returned.
+
+All variables bound inside a block statement are local to that block. After the block completes they are forgotten.
+
+Blocks with if expressions:
+
+```
+if ("Strings are truthy") then
+{
+    let $x = 100;
+    let $y = 200;
+    $x | $ + $y | $ + 1
+}
+else { let $s = "Hello!"; $s }
+```
+
+You may have noticed that the shell has no side effects on its own
+
+Indeed, the outside environment (F#) must provide it with some commands that do have side effects
+
+I guess I will write that up in another few months
