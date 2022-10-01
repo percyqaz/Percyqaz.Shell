@@ -68,7 +68,7 @@ module Parser =
     do
 
         let var = pchar '$' >>. ident |>> Expr.Var
-        let modvar = ident .>>. (pstring "::$" >>. ident) |>> Expr.ModVar
+        let modvar = ident .>>. (pstring ":$" >>. ident) |>> Expr.ModVar
         let pipe_input = pchar '$' >>% Expr.Pipevar
         let cond =
             let arm token =
@@ -154,7 +154,7 @@ module Parser =
             >>= suffixes
 
         let cmd = parse_command |>> Expr.Cmd
-        let modcmd = ident .>>. (pstring "::" >>. parse_command) |>> fun (m, (id, args)) -> Expr.ModCmd(m, id, args)
+        let modcmd = ident .>>. (pstring ":" >>. parse_command) |>> fun (m, (id, args)) -> Expr.ModCmd(m, id, args)
 
         parse_expr_extR := 
             attempt ((lambda <|> parse_expr <|> (attempt modcmd) <|> cmd) |> binops)
@@ -164,7 +164,7 @@ module Parser =
     let parse_toplevel_stmt =
         
         let help = 
-            attempt (pstring "help" >>. spaces1 >>. (ident .>> pstring "::" .>>. ident) |>> Stmt.Help_ModuleCmd)
+            attempt (pstring "help" >>. spaces1 >>. (ident .>> pstring ":" .>>. ident) |>> Stmt.Help_ModuleCmd)
             <|> attempt (pstring "help" >>. spaces1 >>. ident |>> Stmt.Help_ModuleOrCmd)
             <|> (pstring "help" >>% Stmt.Help_All)
 

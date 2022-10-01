@@ -26,7 +26,7 @@ module Runtime =
             match ctx.Modules.TryFind mname with
             | Some m ->
                 match m.Vars.TryFind id with
-                | Some (Val.Func f) -> show_command ctx (mname + "::" + id) f
+                | Some (Val.Func f) -> show_command ctx (mname + ":" + id) f
                 | Some (_) -> failwith "This is a variable, not a command"
                 | None -> failwith "No such command"
             | None -> failwith "No such module"
