@@ -158,6 +158,8 @@ if ("Strings are truthy") then
 else { let $s = "Hello!"; $s }
 ```
 
+### Side effects
+
 You may have noticed that the shell has no side effects on its own
 
 Indeed, the outside environment (F#) must provide it with some commands that do have side effects
