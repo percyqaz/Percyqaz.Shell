@@ -27,7 +27,7 @@ jobs:
     - name: Publish
       uses: tanaka-takayoshi/nuget-publish-to-github-packages-action@v2.1
       with:
-        nupkg-path: ./bin/Release
+        nupkg-path: ./src/bin/Release
         repo-owner: percyqaz
         gh-user: percyqaz
         token: ${{ secrets.GITHUB_TOKEN }}
