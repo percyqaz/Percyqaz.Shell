@@ -4,7 +4,7 @@ open System
 
 module Tree =
 
-    type Func =
+    type [<CustomEquality; NoComparison>] Func =
         {
             // For documentation/help purposes
             Binds: string list
@@ -12,8 +12,10 @@ module Tree =
             // Only this implementation matters
             Impl: Val list -> Val
         }
+        override this.Equals(other) = false
+        override this.GetHashCode() = hash (this.Binds, this.Desc)
     
-    and [<RequireQualifiedAccess>] Val =
+    and [<RequireQualifiedAccess; StructuralEquality; NoComparison>] Val =
         | Str of string
         | Num of float
         | Bool of bool
