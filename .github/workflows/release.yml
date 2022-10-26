@@ -1,6 +1,9 @@
 name: Test & Release
 
 on:
+  push:
+    branches: [ "main" ]
+    paths: "src/Percyqaz.Shell.fsproj"
   workflow_dispatch:
 
 jobs:
@@ -27,6 +30,5 @@ jobs:
       
     - name: Publish
       run: |
-        ls
         dotnet nuget add source --username percyqaz --password ${{ secrets.PACKAGES_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/percyqaz/index.json"
         dotnet nuget push "Percyqaz.Shell.?.?.?.nupkg" --api-key ${{ secrets.PACKAGES_TOKEN }} --source "github"
