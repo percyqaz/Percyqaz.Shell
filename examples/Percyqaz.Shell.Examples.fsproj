@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Percyqaz.Shell\Percyqaz.Shell.fsproj" />
+    <ProjectReference Include="..\src\Percyqaz.Shell.fsproj" />
   </ItemGroup>
 
 </Project>

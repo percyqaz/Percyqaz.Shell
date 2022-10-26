@@ -2,13 +2,9 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/.vs
-/src/.vs/Percyqaz.Shell
-/src/Percyqaz.Shell/bin/
-/src/Percyqaz.Shell/obj
-/src/Percyqaz.Shell.Examples/bin
-/src/Percyqaz.Shell.Examples/obj
-/src/Percyqaz.Shell/nuget.config
+.vs
+*/bin
+*/obj
+/src/nuget.config
 .vscode/settings.json
-
 .fake
