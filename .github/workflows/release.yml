@@ -1,0 +1,34 @@
+name: Test & Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 6.0.x
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Test
+      run: dotnet test --verbosity normal
+      
+    - name: Pack
+      run: cd src && dotnet pack --no-restore --configuration Release
+      
+    - name: Publish
+      uses: tanaka-takayoshi/nuget-publish-to-github-packages-action@v2.1
+      with:
+        nupkg-path: ./bin/Release
+        repo-owner: percyqaz
+        gh-user: percyqaz
+        token: ${{ secrets.GITHUB_TOKEN }}
+        skip-duplicate: false
