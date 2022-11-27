@@ -9,7 +9,7 @@ module Tree =
             // For documentation/help purposes
             Binds: string list
             Desc: string
-            // Only this implementation matters
+            // Actual implementation (Binds list technically does not matter)
             Impl: Val list -> Val
         }
         override this.Equals(other) = false

@@ -14,6 +14,31 @@ module Runtime =
 
     let private error ex message = failwithf "%O : %s" ex message
 
+    module Coerce =
+        
+        let string (value: Val) : string = value.ToString()
+
+        let bool (value: Val) : bool =
+            match value with
+            | Val.Str s -> s <> ""
+            | Val.Num n -> n <> 0
+            | Val.Bool b -> b
+            | Val.Nil -> false
+            | Val.Arr xs -> not xs.IsEmpty
+            | Val.Obj _ -> error value "Cannot cast object to bool"
+            | Val.Func _ -> error value "Cannot cast function to bool"
+
+        open System
+        open System.Globalization
+
+        let num (value: Val) : float =
+            match value with
+            | Val.Str s -> 
+                let ok, r = Double.TryParse(s, NumberStyles.AllowLeadingSign ||| NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture)
+                if ok then r else error value "Cannot cast value to num"
+            | Val.Num n -> n
+            | _ -> error value "Cannot cast value to num"
+
     let rec do_stmt (stmt: Stmt) (ctx: Context) (echo: bool) : Context =
         match stmt with
         | Stmt.Decl (name, ex) -> ctx.WithVar(name, eval_expr ex ctx)
@@ -86,6 +111,7 @@ module Runtime =
             | Val.Arr xs -> 
                 match eval_monop Monop.ROUND sub ctx with
                 | Val.Num n -> try xs.[int n] with _ -> error sub "Index out of bounds"
+                | Val.Str s -> try xs.[Val.Str s |> Coerce.num |> int] with _ -> error sub "Index out of bounds"
                 | _ -> error sub "Expected an array index"
             | Val.Obj xs ->
                 match eval_monop Monop.STR sub ctx with
@@ -105,11 +131,12 @@ module Runtime =
         | Expr.Cond (arms, basecase) ->
             let rec loop arms =
                 match arms with 
-                | (cond, ex) :: arms -> 
-                    match eval_monop Monop.TRUTH cond ctx with
-                    | Val.Bool true ->
-                        eval_expr ex ctx
-                    | _ -> loop arms
+                | (cond, ex) :: arms ->
+                    if 
+                        eval_expr cond ctx
+                        |> Coerce.bool
+                    then eval_expr ex ctx
+                    else loop arms
                 | [] -> eval_expr basecase ctx
             loop arms
 
@@ -170,26 +197,27 @@ module Runtime =
         let numop (f: float -> float -> float) =
             match (eval_expr left ctx, eval_expr right ctx) with
             | Val.Num a, Val.Num b -> Val.Num (f a b)
-            | Val.Num _, _ -> error right "Expected a number"
-            | _ -> error left "Expected a number"
+            | a, b -> Val.Num (f (Coerce.num a) (Coerce.num b))
 
         match op with
         | Binop.OR ->
-            match eval_expr left ctx with
-            | Val.Bool true -> Val.Bool true
-            | Val.Bool false ->
-                match eval_expr right ctx with
-                | Val.Bool b -> Val.Bool b
-                | _ -> error right "Expected a bool"
-            | _ -> error left "Expected a bool"
+            if 
+                eval_expr left ctx
+                |> Coerce.bool
+            then Val.Bool true
+            else
+                eval_expr right ctx
+                |> Coerce.bool
+                |> Val.Bool
         | Binop.AND ->
-            match eval_expr left ctx with
-            | Val.Bool false -> Val.Bool false
-            | Val.Bool true ->
-                match eval_expr right ctx with
-                | Val.Bool b -> Val.Bool b
-                | _ -> error right "Expected a bool"
-            | _ -> error left "Expected a bool"
+            if 
+                eval_expr left ctx
+                |> Coerce.bool
+            then 
+                eval_expr right ctx
+                |> Coerce.bool
+                |> Val.Bool
+            else Val.Bool false
 
         | Binop.PIPE -> eval_expr right (ctx.WithPipeVar(eval_expr left ctx))
         | Binop.ADD -> numop (+)
