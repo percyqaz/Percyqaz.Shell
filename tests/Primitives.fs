@@ -51,6 +51,19 @@ type ``1: Evaluation``() =
         ctx.Evaluate "{ Hello: \"Foo\", \"Hello\": \"World\" }" |> expect (Val.Obj (Map.ofList ["Hello", Val.Str "World"]))
 
     [<Test>]
+    member this.Object_Properties () =
+        
+        ctx.Evaluate "{ Hello: \"World\" }.Hello" |> expect (Val.Str "World")
+        ctx.Evaluate "{ Hello: 2 }[\"Hello\"]" |> expect (Val.Num 2.0)
+        ctx.Evaluate "{ \"Hello World\": 2 }[\"Hello World\"]" |> expect (Val.Num 2.0)
+        
+    [<Test>]
+    member this.Object_Property_Errors () =
+            
+        ctx.Evaluate "{ Hello: \"World\" }.Prop" |> expect_runtime_err
+        ctx.Evaluate "{ \"2\": 100 }[2]" |> expect_runtime_err
+
+    [<Test>]
     member this.Array_Indexing () =
         
         ctx.Evaluate "[3][0]" |> expect (Val.Num 3.0)
@@ -65,9 +78,6 @@ type ``1: Evaluation``() =
         ctx.Evaluate "[1,2,3][True]" |> expect_runtime_err
         ctx.Evaluate "[1,2,3][[]]" |> expect_runtime_err
         ctx.Evaluate "[0.1][0.9]" |> expect (Val.Num 0.1)
-
-    // Object indexing
-    // Object indexing errors
 
     [<Test>]
     member this.Arithmetic () =
@@ -89,13 +99,25 @@ type ``1: Evaluation``() =
         ctx.Evaluate "!(False && False)" |> expect (Val.Bool true)
 
         // Falsy
-        ctx.Evaluate "!?Nil" |> expect (Val.Bool true)
-        ctx.Evaluate "!?0" |> expect (Val.Bool true)
-        ctx.Evaluate "!?[]" |> expect (Val.Bool true)
-        ctx.Evaluate "!?\"\"" |> expect (Val.Bool true)
+        ctx.Evaluate "!Nil" |> expect (Val.Bool true)
+        ctx.Evaluate "!0" |> expect (Val.Bool true)
+        ctx.Evaluate "![]" |> expect (Val.Bool true)
+        ctx.Evaluate "!\"\"" |> expect (Val.Bool true)
 
         // Truthy
-        ctx.Evaluate "!?\"Hello\"" |> expect (Val.Bool false)
-        ctx.Evaluate "!?1" |> expect (Val.Bool false)
-        ctx.Evaluate "!?True" |> expect (Val.Bool false)
-        ctx.Evaluate "!?[1]" |> expect (Val.Bool false)
+        ctx.Evaluate "!\"Hello\"" |> expect (Val.Bool false)
+        ctx.Evaluate "!1" |> expect (Val.Bool false)
+        ctx.Evaluate "!True" |> expect (Val.Bool false)
+        ctx.Evaluate "![1]" |> expect (Val.Bool false)
+
+        ctx.Evaluate "!!\"Bang bang you're a boolean!\"" |> expect (Val.Bool true)
+
+    [<Test>]
+    member this.Conditionals () =
+        
+        ctx.Evaluate "if True then [] else [1]" |> expect (Val.Arr [])
+        ctx.Evaluate "if False then 1 elif True then [] else [1]" |> expect (Val.Arr [])
+        ctx.Evaluate "if False then 1 elif False then [1] else []" |> expect (Val.Arr [])
+
+        ctx.Evaluate "if (1 + 2 - 3) then True else False" |> expect (Val.Bool false)
+        ctx.Evaluate "if (0 | [.,.]) then True else False" |> expect (Val.Bool true)

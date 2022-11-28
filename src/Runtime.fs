@@ -16,7 +16,10 @@ module Runtime =
 
     module Coerce =
         
-        let string (value: Val) : string = value.ToString()
+        let string (value: Val) : string = 
+            match value with
+            | Val.Str s -> s
+            | _ -> value.ToString()
 
         let bool (value: Val) : bool =
             match value with
@@ -121,12 +124,9 @@ module Runtime =
                 | Val.Str s -> try xs.[Val.Str s |> Coerce.num |> int] with _ -> error sub "Index out of bounds"
                 | _ -> error sub "Expected an array index"
             | Val.Obj xs ->
-                match eval_monop Monop.STR sub ctx with
-                | Val.Str prop ->
-                    match xs.TryFind prop with
-                    | None -> error ex "Object has no such property"
-                    | Some v -> v
-                | _ -> error sub "Expected a property identifier"
+                match xs.TryFind (Coerce.string (eval_expr sub ctx)) with
+                | None -> error ex "Object has no such property"
+                | Some v -> v
             | _ -> error ex "Value is not subscriptable"
         | Expr.Prop (main, prop) ->
             match eval_expr main ctx with
@@ -164,31 +164,21 @@ module Runtime =
 
     and eval_monop (op: Monop) (ex: Expr) (ctx: Context) : Val =
         match op with
-        | Monop.ECHO ->
-            let v = eval_expr ex ctx in ctx.WriteLine (sprintf "%O" v); v
-        | Monop.STR -> Val.Str (sprintf "%O" (eval_expr ex ctx))
-        | Monop.TRUTH ->
-            match eval_expr ex ctx with
-            | Val.Str s -> s <> ""
-            | Val.Num n -> n <> 0
-            | Val.Bool b -> b
-            | Val.Nil -> false
-            | Val.Arr xs -> not xs.IsEmpty
-            | Val.Obj xs -> error ex "Cannot cast object to bool"
-            | Val.Func _ -> error ex "Cannot cast function to bool"
-            |> Val.Bool
         | Monop.NOT ->
-            match eval_expr ex ctx with
-            | Val.Bool b -> Val.Bool (not b)
-            | _ -> error ex "Expected a bool"
+            eval_expr ex ctx
+            |> Coerce.bool
+            |> not
+            |> Val.Bool
         | Monop.NEG ->
-            match eval_expr ex ctx with
-            | Val.Num n -> Val.Num (-n)
-            | _ -> error ex "Expected a number"
+            eval_expr ex ctx
+            |> Coerce.num
+            |> fun x -> -x
+            |> Val.Num
         | Monop.ROUND ->
-            match eval_expr ex ctx with
-            | Val.Num n -> Val.Num (System.Math.Round n)
-            | _ -> error ex "Expected a number"
+            eval_expr ex ctx
+            |> Coerce.num
+            |> System.Math.Round
+            |> Val.Num
         | Monop.LEN ->
             match eval_expr ex ctx with
             | Val.Arr xs -> xs.Length |> float |> Val.Num

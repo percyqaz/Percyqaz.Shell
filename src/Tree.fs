@@ -44,18 +44,12 @@ module Tree =
             | Func f -> sprintf "<function of arity %i>" f.Binds.Length
 
     and [<RequireQualifiedAccess>] Monop =
-        | ECHO
-        | STR
-        | TRUTH
         | NOT
         | NEG
         | ROUND
         | LEN
         override this.ToString() =
             match this with
-            | ECHO -> "@:"
-            | STR -> "@"
-            | TRUTH -> "?"
             | NOT -> "!"
             | NEG -> "-"
             | ROUND -> "~"

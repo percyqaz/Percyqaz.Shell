@@ -102,9 +102,6 @@ module Parser =
 
         let monop =
             choice [
-                stringReturn "@:" Monop.ECHO
-                stringReturn "@" Monop.STR
-                stringReturn "?" Monop.TRUTH
                 stringReturn "!" Monop.NOT
                 stringReturn "-" Monop.NEG
                 stringReturn "~" Monop.ROUND
