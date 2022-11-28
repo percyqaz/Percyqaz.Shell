@@ -5,7 +5,7 @@ open Percyqaz.Shell.Tree
 open NUnit.Framework
 
 [<TestFixture>]
-type ``1: Evaluation``() =
+type ``1: Simple Evaluation``() =
 
     let ctx = Context.Empty
 
