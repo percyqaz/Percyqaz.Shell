@@ -28,27 +28,27 @@ module Types =
 
     let nil : Type<unit> =
         create "Unit" 
-            (function Val.Nil -> () | x -> unexpected x "Expected nil")
+            (Runtime.Coerce.nil)
             (fun () -> Val.Nil)
 
     let bool : Type<bool> =
         create "Boolean"
-            (function Val.Bool b -> b | x -> unexpected x "Expected a boolean")
+            (Runtime.Coerce.bool)
             Val.Bool
 
     let int : Type<int> =
         create "Integer"
-            (function Val.Num n -> int n | x -> unexpected x "Expected an integer")
+            (Runtime.Coerce.num >> int)
             (float >> Val.Num)
 
     let num : Type<float> =
         create "Number"
-            (function Val.Num n -> n | x -> unexpected x "Expected a number")
+            (Runtime.Coerce.num)
             Val.Num
 
     let str : Type<string> =
         create "String"
-            (function Val.Str s -> s | x -> unexpected x "Expected a string")
+            (Runtime.Coerce.string)
             Val.Str
 
     let list (ty: Type<'T>) : Type<'T list> =

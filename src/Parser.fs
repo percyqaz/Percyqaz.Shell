@@ -5,7 +5,9 @@ module Parser =
     open FParsec
     open Tree
 
-    let private ident = identifier (new IdentifierOptions())
+    let private ident = identifier (new IdentifierOptions(isAsciiLower))
+    let private property = identifier (new IdentifierOptions())
+    // todo: module names capital only?
     let private stringLiteral =
 
         let escape =
@@ -20,15 +22,18 @@ module Parser =
 
         between (pstring "\"") (pstring "\"") (stringsSepBy normalCharSnippet escapedCharSnippet)
         
-    let parse_command, private parse_commandR = createParserForwardedToRef<string * Expr list, unit>()
+    let parse_command, private parse_commandR = createParserForwardedToRef<string * Arg list, unit>()
     let parse_val_expr, private parse_val_exprR = createParserForwardedToRef<Expr, unit>()
     let parse_expr, private parse_exprR = createParserForwardedToRef<Expr, unit>()
+    let parse_arg, private parse_argR = createParserForwardedToRef<Arg, unit>()
     let parse_expr_ext, private parse_expr_extR = createParserForwardedToRef<Expr, unit>()
     let parse_block_stmt, private parse_block_stmtR = createParserForwardedToRef<Stmt, unit>()
 
-    do parse_commandR := tuple2 ident (many (attempt (spaces1 >>. parse_expr)))
+    do parse_commandR := tuple2 ident (many1 (attempt (spaces1 >>. parse_arg)))
 
     do
+
+        // SIMPLE VALUES
 
         let jtrue  = stringReturn "True" (Expr.Bool true)
         let jfalse = stringReturn "False" (Expr.Bool false)
@@ -42,6 +47,7 @@ module Parser =
                 | (pre, None) -> pre
             |>> System.Double.TryParse
             |>> fun (s, v) -> Expr.Num v
+        let jstring = stringLiteral |>> Expr.Str
 
         let strinterp =
             let frag : Parser<StrFrag, unit> =
@@ -51,12 +57,13 @@ module Parser =
             between (pchar '`') (pchar '`') (many frag) |>> Expr.StrInterp
 
         let ws = spaces
-        let jstring = stringLiteral |>> Expr.Str
-        let listBetweenStrings sOpen sClose pElement f =
+        let commaSeparatedBetween sOpen sClose pElement f =
             between (pstring sOpen) (pstring sClose) (ws >>. sepBy (pElement .>> ws) (pstring "," >>. ws) |>> f)
-        let jlist = listBetweenStrings "[" "]" parse_expr_ext Expr.Arr
-        let keyValue = (stringLiteral <|> ident) .>>. (ws >>. pstring ":" >>. ws >>. parse_expr_ext)
-        let jobject = listBetweenStrings "{" "}" keyValue (Map.ofList >> Expr.Obj)
+
+        let jlist = commaSeparatedBetween "[" "]" parse_expr_ext Expr.Arr
+
+        let keyValue = (stringLiteral <|> property) .>>. (ws >>. pstring ":" >>. ws >>. parse_expr_ext)
+        let jobject = commaSeparatedBetween "{" "}" keyValue (Map.ofList >> Expr.Obj)
 
         parse_val_exprR := choiceL [jobject; jlist; jstring; strinterp; jnumber; jtrue; jfalse; jnull] "Value"
 
@@ -67,9 +74,9 @@ module Parser =
 
     do
 
-        let var = pchar '$' >>. ident |>> Expr.Var
-        let modvar = ident .>>. (pstring ":$" >>. ident) |>> Expr.ModVar
-        let pipe_input = pchar '$' >>% Expr.Pipevar
+        let var = ident |>> Expr.Var
+        let modvar = ident .>>. (pchar ':' >>. ident) |>> Expr.ModVar
+        let pipe_input = pchar '.' >>% Expr.Pipevar
         let cond =
             let arm token =
                 (pstring token >>. spaces1 >>. parse_expr .>> spaces1)
@@ -80,17 +87,17 @@ module Parser =
                 (pstring "else" >>. spaces1 >>. parse_expr_ext)
             |>> fun (head, body, basecase) -> Expr.Cond (head :: body, basecase)
 
-        let subscript = between (pchar '[' >>. spaces) (spaces >>. pchar ']') parse_expr_ext |>> Sub
-        let property = pchar '.' >>. ident |>> Prop
-        let call = between (pchar '(' >>. spaces) (spaces .>> pchar ')') (sepBy parse_expr_ext (spaces >>. pchar ',' >>. spaces)) |>> Call
+        let subscript_suffix = between (pchar '[' >>. spaces) (spaces >>. pchar ']') parse_expr_ext |>> Sub
+        let property_suffix = pchar '.' >>. property |>> Prop
+        let call_suffix = between (pchar '(' >>. spaces) (spaces .>> pchar ')') (sepBy parse_expr_ext (spaces >>. pchar ',' >>. spaces)) |>> Call
         let suffixes ex =
             let rec foldSuffixes ex xs =
                 match xs with
                 | Prop p :: xs -> foldSuffixes (Expr.Prop (ex, p)) xs
                 | Sub s :: xs -> foldSuffixes (Expr.Sub(ex, s)) xs
-                | Call args :: xs -> foldSuffixes (Expr.VarCall(ex, args)) xs
+                | Call args :: xs -> foldSuffixes (Expr.Call(ex, args)) xs
                 | [] -> ex
-            many (subscript <|> property <|> call)
+            many (subscript_suffix <|> property_suffix <|> call_suffix)
             |>> foldSuffixes ex
 
         let monop =
@@ -101,6 +108,7 @@ module Parser =
                 stringReturn "!" Monop.NOT
                 stringReturn "-" Monop.NEG
                 stringReturn "~" Monop.ROUND
+                stringReturn "#" Monop.LEN
             ] .>>.
             (spaces >>. parse_expr)
             |>> Expr.Monop
@@ -121,7 +129,8 @@ module Parser =
                     spaces >>. ops .>>. (spaces >>. p)
                     |>> fun (op, rest) -> Expr.Binop(op, left, rest)
                     >>= binop ops p
-                ) <|> preturn left
+                )
+                <|> preturn left
 
             let l1 = 
                 expr_parser
@@ -129,15 +138,15 @@ module Parser =
                     stringReturn "&&" Binop.AND
                     stringReturn "*" Binop.MUL
                     stringReturn "/" Binop.DIV
-                ]) expr_parser
+                ] <?> "Logic operator") expr_parser
             let l2 =
                 l1
                 >>= binop (choice [
                     stringReturn "||" Binop.OR
                     stringReturn "+" Binop.ADD
                     stringReturn "-" Binop.SUB
-                ]) l1
-            let l3 = l2 >>= binop (stringReturn "|" Binop.PIPE) l2
+                ] <?> "Numeric operator") l1
+            let l3 = l2 >>= binop (stringReturn "|" Binop.PIPE <?> "Pipe operator") l2
             l3
 
         let block = 
@@ -150,14 +159,25 @@ module Parser =
             |>> Expr.Block
 
         parse_exprR := 
-            choiceL [attempt modvar; attempt var; cond; pipe_input; monop; parse_val_expr; brackets] "Expression"
+            choiceL [cond; attempt modvar; attempt var; pipe_input; monop; parse_val_expr; brackets] "Expression"
             >>= suffixes
 
-        let cmd = parse_command |>> Expr.Cmd
-        let modcmd = ident .>>. (pstring ":" >>. parse_command) |>> fun (m, (id, args)) -> Expr.ModCmd(m, id, args)
+        parse_argR := 
+            pchar '$' >>. parse_expr |>> Arg.Expr
+            <|> (stringLiteral |>> Arg.Pure)
+            <|> (
+                notFollowedByString "then"
+                >>. notFollowedByString "elif"
+                >>. notFollowedByString "else"
+                >>. many1Satisfy (fun c -> isAsciiLetter c || isAnyOf "0123456789_@.:~#!?" c) |>> Arg.Pure
+            )
+
+        let apps ex =
+            many (attempt (spaces1 >>. parse_arg))
+            |>> function [] -> ex | xs -> Expr.App(ex, xs)
 
         parse_expr_extR := 
-            attempt ((lambda <|> parse_expr <|> (attempt modcmd) <|> cmd) |> binops)
+            attempt ((lambda <|> parse_expr) >>= apps |> binops)
             <|> block
             <?> "Expression or command"
 
@@ -170,7 +190,7 @@ module Parser =
 
         let decl =
             tuple2
-                (pstring "let" >>. spaces1 >>. pchar '$' >>. ident .>> spaces)
+                (pstring "let" >>. spaces1 >>. ident .>> spaces)
                 (pstring "=" >>. spaces >>. parse_expr_ext)
             |>> Stmt.Decl
 

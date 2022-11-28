@@ -26,7 +26,7 @@ module Tree =
         | Func of Func
         override this.ToString() =
             match this with
-            | Str s -> s
+            | Str s -> sprintf "%A" s
             | Num n -> sprintf "%O" n
             | Bool b -> if b then "True" else "False"
             | Nil -> "Nil"
@@ -50,6 +50,7 @@ module Tree =
         | NOT
         | NEG
         | ROUND
+        | LEN
         override this.ToString() =
             match this with
             | ECHO -> "@:"
@@ -58,6 +59,7 @@ module Tree =
             | NOT -> "!"
             | NEG -> "-"
             | ROUND -> "~"
+            | LEN -> "#"
 
     and [<RequireQualifiedAccess>] Binop =
         | OR
@@ -81,6 +83,10 @@ module Tree =
         | Ex of Expr
         | Str of string
 
+    and [<RequireQualifiedAccess>] Arg =
+        | Expr of Expr
+        | Pure of string
+
     and [<RequireQualifiedAccess>] Expr =
         | Str of string
         | StrInterp of StrFrag list
@@ -101,9 +107,8 @@ module Tree =
         | Cond of arms: (Expr * Expr) list * basecase: Expr
 
         | Block of Stmt list * Expr
-        | Cmd of id: string * args: Expr list
-        | ModCmd of modname: string * id: string * args: Expr list
-        | VarCall of Expr * args: Expr list
+        | App of cmd: Expr * args: Arg list
+        | Call of Expr * args: Expr list
         override this.ToString() =
             match this with
             | Str s -> sprintf "%A" s
@@ -127,17 +132,16 @@ module Tree =
 
             | Monop (op, ex) -> sprintf "%O%O" op ex
             | Binop (op, left, right) -> sprintf "(%O %O %O)" left op right
-            | Pipevar -> "$"
-            | Var v -> sprintf "$%s" v
-            | ModVar (m, v) -> sprintf "%s::$%s" m v
+            | Pipevar -> "."
+            | Var v -> sprintf "%s" v
+            | ModVar (m, v) -> sprintf "%s:%s" m v
             | Sub (main, sub) -> sprintf "%O[%O]" main sub
             | Prop (main, prop) -> sprintf "%O.%s" main prop
             | Cond (_, basecase) -> sprintf "if ... else %O" basecase
             
             | Block (_, ex) -> sprintf "{ ... ; %O }" ex
-            | Cmd (id, _) -> id
-            | ModCmd (m, id, _) -> sprintf "%s::%s" m id
-            | VarCall (ex, _) -> sprintf "%O(...)" ex
+            | App (ex, _) -> sprintf "%O ..." ex
+            | Call (ex, _) -> sprintf "%O(...)" ex
 
     and [<RequireQualifiedAccess>] Stmt =
         | Decl of string * Expr

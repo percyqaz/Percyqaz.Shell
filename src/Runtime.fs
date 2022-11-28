@@ -39,6 +39,8 @@ module Runtime =
             | Val.Num n -> n
             | _ -> error value "Cannot cast value to num"
 
+        let nil (_: Val) : unit = ()
+
     let rec do_stmt (stmt: Stmt) (ctx: Context) (echo: bool) : Context =
         match stmt with
         | Stmt.Decl (name, ex) -> ctx.WithVar(name, eval_expr ex ctx)
@@ -74,6 +76,11 @@ module Runtime =
             ctx.WriteLine(sprintf "Available commands: %s" (String.concat ", " commands))
             ctx.WriteLine(sprintf "Available modules: %s" (String.concat ", " modules))
             ctx
+
+    and eval_arg (arg: Arg) (ctx: Context) : Val =
+        match arg with
+        | Arg.Expr ex -> eval_expr ex ctx
+        | Arg.Pure s -> Val.Str s
 
     and eval_expr (ex: Expr) (ctx: Context) : Val =
         match ex with
@@ -146,20 +153,11 @@ module Runtime =
                 | [] -> ctx
                 | stmt :: xs -> loop xs (do_stmt stmt ctx false)
             eval_expr ex (loop stmts ctx)
-        | Expr.Cmd (id, args) ->
-            match ctx.Vars.TryFind id with
-            | Some (Val.Func f) -> f.Impl (List.map (fun ex -> eval_expr ex ctx) args)
-            | Some _ -> error ex "Value is not callable"
-            | None -> error ex "No such command"
-        | Expr.ModCmd (m, id, args) ->
-            match ctx.Modules.TryFind m with
-            | None -> error ex "No such module"
-            | Some m ->
-                match Map.tryFind id m.Vars with
-                | Some (Val.Func f) -> f.Impl (List.map (fun ex -> eval_expr ex ctx) args)
-                | Some _ -> error ex "Module value is not callable"
-                | None -> error ex "No such module command"
-        | Expr.VarCall (main, args) ->
+        | Expr.App (ex, args) ->
+            match eval_expr ex ctx with
+            | Val.Func f -> f.Impl (List.map (fun ex -> eval_arg ex ctx) args)
+            | _ -> error ex "Value is not callable"
+        | Expr.Call (main, args) ->
             match eval_expr main ctx with
             | Val.Func f -> f.Impl (List.map (fun ex -> eval_expr ex ctx) args)
             | _ -> error ex "Value is not callable"
@@ -191,6 +189,10 @@ module Runtime =
             match eval_expr ex ctx with
             | Val.Num n -> Val.Num (System.Math.Round n)
             | _ -> error ex "Expected a number"
+        | Monop.LEN ->
+            match eval_expr ex ctx with
+            | Val.Arr xs -> xs.Length |> float |> Val.Num
+            | _ -> error ex "Expected an array"
 
     and eval_binop (op: Binop) (left: Expr) (right: Expr) (ctx: Context) : Val =
         

@@ -33,12 +33,12 @@ let context =
 
 context.RunScript
     """
-        let $x = [5, 6, 7]
-        ; let $y =
-            $x
-            | map (|a| -> $a * $a) $
-            | sum $
-        ; $y + 5
+        let x = [5, 6, 7]
+        ; let y =
+            x
+            | map $(|a| -> a * a) $.
+            | sum(.)
+        ; y + 5
     """
 |> printfn "%A"
 
