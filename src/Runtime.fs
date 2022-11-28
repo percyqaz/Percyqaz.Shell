@@ -50,6 +50,9 @@ module Runtime =
         | Stmt.Eval ex ->
             match eval_expr ex ctx with
             | Val.Nil -> ()
+            | Val.Func f when f.Binds.IsEmpty ->
+                let x = f.Impl []
+                if echo then sprintf "%O" x |> ctx.WriteLine
             | x -> if echo then sprintf "%O" x |> ctx.WriteLine
             ctx
         | Stmt.Help_ModuleCmd (mname, id) ->
