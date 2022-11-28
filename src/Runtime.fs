@@ -52,8 +52,10 @@ module Runtime =
             | Val.Nil -> ()
             | Val.Func f when f.Binds.IsEmpty ->
                 let x = f.Impl []
-                if echo then sprintf "%O" x |> ctx.WriteLine
-            | x -> if echo then sprintf "%O" x |> ctx.WriteLine
+                match x with
+                | Val.Nil -> ()
+                | _ -> if echo then Coerce.string x |> ctx.WriteLine
+            | x -> if echo then Coerce.string x |> ctx.WriteLine
             ctx
         | Stmt.Help_ModuleCmd (mname, id) ->
             match ctx.Modules.TryFind mname with
