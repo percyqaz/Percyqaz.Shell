@@ -7,6 +7,7 @@ module Parser =
 
     let private ident = identifier (new IdentifierOptions(isAsciiLower))
     let private property = identifier (new IdentifierOptions())
+    let private modname = identifier (new IdentifierOptions())
     // todo: module names capital only?
     let private stringLiteral =
 
@@ -29,7 +30,7 @@ module Parser =
     let parse_expr_ext, private parse_expr_extR = createParserForwardedToRef<Expr, unit>()
     let parse_block_stmt, private parse_block_stmtR = createParserForwardedToRef<Stmt, unit>()
 
-    do parse_commandR := tuple2 ident (many1 (attempt (spaces1 >>. parse_arg)))
+    do parse_commandR := tuple2 ident (many1 (attempt (spaces1 >>. parse_arg))) <?> "Command"
 
     do
 
@@ -176,13 +177,13 @@ module Parser =
         parse_expr_extR := 
             attempt ((lambda <|> parse_expr) >>= apps |> binops)
             <|> block
-            <?> "Expression or command"
+            <?> "Expression"
 
     let parse_toplevel_stmt =
         
         let help = 
-            attempt (pstring "help" >>. spaces1 >>. (ident .>> pstring ":" .>>. ident) |>> Stmt.Help_ModuleCmd)
-            <|> attempt (pstring "help" >>. spaces1 >>. ident |>> Stmt.Help_ModuleOrCmd)
+            attempt (pstring "help" >>. spaces1 >>. (modname .>> pstring ":" .>>. ident) |>> Stmt.Help_ModuleCmd)
+            <|> attempt (pstring "help" >>. spaces1 >>. (ident <|> modname) |>> Stmt.Help_ModuleOrCmd)
             <|> (pstring "help" >>% Stmt.Help_All)
 
         let decl =
