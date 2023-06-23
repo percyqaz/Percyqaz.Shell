@@ -17,20 +17,23 @@ type ShellContext =
 
     member this.WithCommand(name: string, func: Func) = { this with Commands = Map.add name func this.Commands }
 
-    member this.WithCommand (name: string, desc: string, args: string list, impl: 'A -> 'T) =
-        this.WithCommand(name, Command.create desc args (Impl.Create1 impl))
+    member this.WithCommand (name: string, desc: string, impl: unit -> 'T) =
+        this.WithCommand(name, Command.create desc [""] (Impl.Create1 impl))
 
-    member this.WithCommand (name: string, desc: string, args: string list, impl: 'A -> 'B -> 'T) =
-        this.WithCommand(name, Command.create desc args (Impl.Create2 impl))
+    member this.WithCommand (name: string, desc: string, arg1name, impl: 'A -> 'T) =
+        this.WithCommand(name, Command.create desc [arg1name] (Impl.Create1 impl))
 
-    member this.WithCommand (name: string, desc: string, args: string list, impl: 'A -> 'B -> 'C -> 'T) =
-        this.WithCommand(name, Command.create desc args (Impl.Create3 impl))
+    member this.WithCommand (name: string, desc: string, arg1name, arg2name, impl: 'A -> 'B -> 'T) =
+        this.WithCommand(name, Command.create desc [arg1name; arg2name] (Impl.Create2 impl))
 
-    member this.WithCommand (name: string, desc: string, args: string list, impl: 'A -> 'B -> 'C -> 'D -> 'T) =
-        this.WithCommand(name, Command.create desc args (Impl.Create4 impl))
+    member this.WithCommand (name: string, desc: string, arg1name, arg2name, arg3name, impl: 'A -> 'B -> 'C -> 'T) =
+        this.WithCommand(name, Command.create desc [arg1name; arg2name; arg3name] (Impl.Create3 impl))
 
-    member this.WithCommand (name: string, desc: string, args: string list, impl: 'A -> 'B -> 'C -> 'D -> 'E -> 'T) =
-        this.WithCommand(name, Command.create desc args (Impl.Create5 impl))
+    member this.WithCommand (name: string, desc: string, arg1name, arg2name, arg3name, arg4name, impl: 'A -> 'B -> 'C -> 'D -> 'T) =
+        this.WithCommand(name, Command.create desc [arg1name; arg2name; arg3name; arg4name] (Impl.Create4 impl))
+
+    member this.WithCommand (name: string, desc: string, arg1name, arg2name, arg3name, arg4name, arg5name, impl: 'A -> 'B -> 'C -> 'D -> 'E -> 'T) =
+        this.WithCommand(name, Command.create desc [arg1name; arg2name; arg3name; arg4name; arg5name] (Impl.Create5 impl))
         
 
 module Shell =
@@ -180,6 +183,6 @@ module Shell =
             | Success(res, _, _) -> dispatch res this
             | Failure(err, _, _) ->
                 let s = err.ToString()
-                let s = s.Substring(s.IndexOf('\n') + 1).Replace("Note: The error occurred at the end of the input stream.\r\n", "")
+                let s = s.Substring(s.IndexOf('\n') + 1).Replace("Note: The error occurred at the end of the input stream.\r\n", "   ")
                 let s = s.Substring(s.IndexOf('\n') + 1).TrimEnd()
                 this.WriteLine (sprintf "  %s" s)

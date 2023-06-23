@@ -51,7 +51,7 @@ module Data =
         | Fun of Func
         override this.ToString() =
             match this with
-            | Text s -> sprintf "%A" s
+            | Text s -> s
             | Num n -> sprintf "%O" n
             | Nil -> "Nil"
 

@@ -116,7 +116,7 @@ module TypeConversion =
         | x when x = typeof<float array> -> arr num |> unbox
         | x when x = typeof<bool array> -> arr bool |> unbox
         | x when x = typeof<Val array> -> arr any |> unbox
-        | _ -> failwith "Automatic type not supported"
+        | _t -> failwithf "Automatic type not supported for %O" _t
 
 type private _Impl = (Val list -> Val) * Type list * Type
 
