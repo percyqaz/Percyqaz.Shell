@@ -5,10 +5,6 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Percyqaz.Shell", "src\Percyqaz.Shell.fsproj", "{14192A6D-05C5-4732-AF9A-8BFF9620A17A}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Percyqaz.Shell.Examples", "examples\Percyqaz.Shell.Examples.fsproj", "{AEAD74D5-98AC-4F46-B33C-DD1386638A7B}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Percyqaz.Shell.Tests", "tests\Percyqaz.Shell.Tests.fsproj", "{A9CAE2E4-B86E-4033-AAE9-0C03FE021886}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +23,10 @@ Global
 		{A9CAE2E4-B86E-4033-AAE9-0C03FE021886}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A9CAE2E4-B86E-4033-AAE9-0C03FE021886}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A9CAE2E4-B86E-4033-AAE9-0C03FE021886}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F300B9EA-C56B-4615-8C4C-9C295D99C7B8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F300B9EA-C56B-4615-8C4C-9C295D99C7B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F300B9EA-C56B-4615-8C4C-9C295D99C7B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F300B9EA-C56B-4615-8C4C-9C295D99C7B8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,217 +1,252 @@
 ﻿namespace Percyqaz.Shell
 
-open Tree
+open Percyqaz.Shell.Data
 
-type Type<'T> =
+type TypeConversion<'T> =
     {
-        Name: string
+        Type: Type
         Up: Val -> 'T
         Down: 'T -> Val
     }
 
-module Types =
+module TypeCoercion =
+
+    let private error ex message = failwithf "%O : %s" ex message
+
+    let rec string (value: Val) : string = 
+        match value with
+        | Val.Text s -> s
+        | Val.Atom (s, Val.Nil) -> s
+        | Val.Atom (_, v) -> string v
+        | _ -> value.ToString()
+
+    let rec bool (value: Val) : bool =
+        match value with
+        | Val.Text s -> s <> ""
+        | Val.Num n -> n <> 0
+        | Val.Nil -> false
+        | Val.Atom ("True", _) -> true
+        | Val.Atom ("False", _) -> false
+        | Val.Atom (_, v) -> bool v
+        | Val.Arr xs -> not xs.IsEmpty
+        | Val.Obj _ -> error value "Cannot cast object to bool"
+        | Val.Fun _ -> error value "Cannot cast function to bool"
+
+    open System
+    open System.Globalization
+
+    let rec num (value: Val) : float =
+        match value with
+        | Val.Text s -> 
+            let ok, r = Double.TryParse(s, NumberStyles.AllowLeadingSign ||| NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture)
+            if ok then r else error value "Cannot cast value to num"
+        | Val.Num n -> n
+        | Val.Atom (_, n) -> num n
+        | _ -> error value "Cannot cast value to num"
+
+    let nil (_: Val) : unit = ()
+
+module TypeConversion =
     
     [<AutoOpen>]
     module Helpers =
         
-        let create<'T> (name: string) (up: Val -> 'T) (down: 'T -> Val) : Type<'T> =
+        let create<'T> (ty: Type) (up: Val -> 'T) (down: 'T -> Val) : TypeConversion<'T> =
             {
-                Name = name
+                Type = ty
                 Up = up
                 Down = down
             }
 
         let unexpected x message = failwithf "%O: %s" x message
 
-    let any : Type<Val> =
-        create "Any" id id
+    let any : TypeConversion<Val> =
+        create Type.Any id id
 
-    let nil : Type<unit> =
-        create "Unit" 
-            (Runtime.Coerce.nil)
+    let nil : TypeConversion<unit> =
+        create Type.Nil
+            TypeCoercion.nil
             (fun () -> Val.Nil)
 
-    let bool : Type<bool> =
-        create "Boolean"
-            (Runtime.Coerce.bool)
-            Val.Bool
+    let bool : TypeConversion<bool> =
+        create Type.Boolean
+            TypeCoercion.bool
+            (fun b -> Val.Atom ((if b then "True" else "False"), Val.Nil))
 
-    let int : Type<int> =
-        create "Integer"
-            (Runtime.Coerce.num >> int)
+    let int : TypeConversion<int> =
+        create Type.Number
+            (TypeCoercion.num >> int)
             (float >> Val.Num)
 
-    let num : Type<float> =
-        create "Number"
-            (Runtime.Coerce.num)
+    let num : TypeConversion<float> =
+        create Type.Number
+            TypeCoercion.num
             Val.Num
 
-    let str : Type<string> =
-        create "String"
-            (Runtime.Coerce.string)
-            Val.Str
+    let str : TypeConversion<string> =
+        create Type.Text
+            TypeCoercion.string
+            Val.Text
 
-    let list (ty: Type<'T>) : Type<'T list> =
-        create ("List of " + ty.Name)
+    let list (ty: TypeConversion<'T>) : TypeConversion<'T list> =
+        create (Type.Array ty.Type)
             (function Val.Arr xs -> List.map ty.Up xs | x -> unexpected x "Expected an array")
             (List.map ty.Down >> Val.Arr)
 
-    let arr (ty: Type<'T>) : Type<'T array> =
-        create ("Array of " + ty.Name)
+    let arr (ty: TypeConversion<'T>) : TypeConversion<'T array> =
+        create (Type.Array ty.Type)
             (function Val.Arr xs -> List.map ty.Up xs |> Array.ofList | x -> unexpected x "Expected an array")
             (Array.toList >> List.map ty.Down >> Val.Arr)
 
-type private _Impl = Val list -> Val
+    let auto_type<'T>() : TypeConversion<'T> =
+        match typeof<'T> with
+        | x when x = typeof<string> -> str |> unbox
+        | x when x = typeof<int> -> int |> unbox
+        | x when x = typeof<float> -> num |> unbox
+        | x when x = typeof<bool> -> bool |> unbox
+        | x when x = typeof<unit> -> nil |> unbox
+        | x when x = typeof<Val> -> any |> unbox
+        | x when x = typeof<string list> -> list str |> unbox
+        | x when x = typeof<int list> -> list int |> unbox
+        | x when x = typeof<float list> -> list num |> unbox
+        | x when x = typeof<bool list> -> list bool |> unbox
+        | x when x = typeof<Val list> -> list any |> unbox
+        | x when x = typeof<string array> -> arr str |> unbox
+        | x when x = typeof<int array> -> arr int |> unbox
+        | x when x = typeof<float array> -> arr num |> unbox
+        | x when x = typeof<bool array> -> arr bool |> unbox
+        | x when x = typeof<Val array> -> arr any |> unbox
+        | _ -> failwith "Automatic type not supported"
+
+type private _Impl = (Val list -> Val) * Type list * Type
 
 type Impl =
     
-    static member Create(f: unit -> 'T, ret: Type<'T>) : _Impl =
-        fun xs ->
-            if xs.Length <> 0 then failwith "Expected 0 arguments"
-            else ret.Down (f())
-
-    static member Create(f: unit -> unit) = Impl.Create(f, Types.nil)
-    
-    static member Create(
-        a1: Type<'A>,
+    // Arity 1
+    static member Create1(
+        a1: TypeConversion<'A>,
         f: 'A -> 'T,
-        ret: Type<'T>
+        ret: TypeConversion<'T>
         ) : _Impl =
         fun xs ->
             match xs with
             | a :: [] -> f (a1.Up a) |> ret.Down
             | _ -> failwith "Expected 1 argument"
+        , [a1.Type]
+        , ret.Type
 
-    static member Create(
-        a1: Type<'A>,
-        f: 'A -> unit
-        ) = Impl.Create(a1, f, Types.nil)
-    
-    static member Create(
-        a1: Type<'A>,
-        a2: Type<'B>,
+    static member Create1(f: 'A -> 'T) : _Impl = 
+        Impl.Create1(
+            TypeConversion.auto_type<'A>(),
+            f,
+            TypeConversion.auto_type<'T>()
+        )
+
+    // Arity 2
+    static member Create2(
+        a1: TypeConversion<'A>,
+        a2: TypeConversion<'B>,
         f: 'A -> 'B -> 'T,
-        ret: Type<'T>
+        ret: TypeConversion<'T>
         ) : _Impl =
         fun xs ->
             match xs with
             | a :: b :: [] -> f (a1.Up a) (a2.Up b) |> ret.Down
             | _ -> failwith "Expected 2 arguments"
-            
-    static member Create(
-        a1: Type<'A>,
-        a2: Type<'B>,
-        f: 'A -> 'B -> unit
-        ) = Impl.Create(a1, a2, f, Types.nil)
-    
-    static member Create(
-        a1: Type<'A>,
-        a2: Type<'B>,
-        a3: Type<'C>,
+        , [a1.Type; a2.Type]
+        , ret.Type
+
+    static member Create2(f: 'A -> 'B -> 'T) : _Impl = 
+        Impl.Create2(
+            TypeConversion.auto_type<'A>(),
+            TypeConversion.auto_type<'B>(),
+            f,
+            TypeConversion.auto_type<'T>()
+        )
+
+    // Arity 3
+    static member Create3(
+        a1: TypeConversion<'A>,
+        a2: TypeConversion<'B>,
+        a3: TypeConversion<'C>,
         f: 'A -> 'B -> 'C -> 'T,
-        ret: Type<'T>
+        ret: TypeConversion<'T>
         ) : _Impl =
         fun xs ->
             match xs with
             | a :: b :: c :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) |> ret.Down
             | _ -> failwith "Expected 3 arguments"
+        , [a1.Type; a2.Type; a3.Type]
+        , ret.Type
+
+    static member Create3(f: 'A -> 'B -> 'C -> 'T) : _Impl = 
+        Impl.Create3(
+            TypeConversion.auto_type<'A>(),
+            TypeConversion.auto_type<'B>(),
+            TypeConversion.auto_type<'C>(),
+            f,
+            TypeConversion.auto_type<'T>()
+        )
     
-    static member Create(
-        a1: Type<'A>,
-        a2: Type<'B>,
-        a3: Type<'C>,
-        f: 'A -> 'B -> 'C -> unit
-        ) = Impl.Create(a1, a2, a3, f, Types.nil)
-    
-    static member Create(
-        a1: Type<'A>,
-        a2: Type<'B>,
-        a3: Type<'C>,
-        a4: Type<'D>,
+    // Arity 4
+    static member Create4(
+        a1: TypeConversion<'A>,
+        a2: TypeConversion<'B>,
+        a3: TypeConversion<'C>,
+        a4: TypeConversion<'D>,
         f: 'A -> 'B -> 'C -> 'D -> 'T,
-        ret: Type<'T>
+        ret: TypeConversion<'T>
         ) : _Impl =
         fun xs ->
             match xs with
             | a :: b :: c :: d :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) |> ret.Down
             | _ -> failwith "Expected 4 arguments"
+        , [a1.Type; a2.Type; a3.Type; a4.Type]
+        , ret.Type
     
-    static member Create(
-        a1: Type<'A>,
-        a2: Type<'B>,
-        a3: Type<'C>,
-        a4: Type<'D>,
-        f: 'A -> 'B -> 'C -> 'D -> unit
-        ) = Impl.Create(a1, a2, a3, a4, f, Types.nil)
-        
-    static member Create(
-        a1: Type<'A>,
-        a2: Type<'B>,
-        a3: Type<'C>,
-        a4: Type<'D>,
-        a5: Type<'E>,
+    static member Create4(f: 'A -> 'B -> 'C -> 'D -> 'T) : _Impl = 
+        Impl.Create4(
+            TypeConversion.auto_type<'A>(),
+            TypeConversion.auto_type<'B>(),
+            TypeConversion.auto_type<'C>(),
+            TypeConversion.auto_type<'D>(),
+            f,
+            TypeConversion.auto_type<'T>()
+        )
+
+    // Arity 5
+    static member Create5(
+        a1: TypeConversion<'A>,
+        a2: TypeConversion<'B>,
+        a3: TypeConversion<'C>,
+        a4: TypeConversion<'D>,
+        a5: TypeConversion<'E>,
         f: 'A -> 'B -> 'C -> 'D -> 'E -> 'T,
-        ret: Type<'T>
+        ret: TypeConversion<'T>
         ) : _Impl =
         fun xs ->
             match xs with
             | a :: b :: c :: d :: e :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) (a5.Up e) |> ret.Down
             | _ -> failwith "Expected 5 arguments"
-        
-    static member Create(
-        a1: Type<'A>,
-        a2: Type<'B>,
-        a3: Type<'C>,
-        a4: Type<'D>,
-        a5: Type<'E>,
-        f: 'A -> 'B -> 'C -> 'D -> 'E -> unit
-        ) : _Impl = Impl.Create(a1, a2, a3, a4, a5, f, Types.nil)
+        , [a1.Type; a2.Type; a3.Type; a4.Type; a5.Type]
+        , ret.Type
 
+    static member Create5(f: 'A -> 'B -> 'C -> 'D -> 'E -> 'T) : _Impl = 
+        Impl.Create5(
+            TypeConversion.auto_type<'A>(),
+            TypeConversion.auto_type<'B>(),
+            TypeConversion.auto_type<'C>(),
+            TypeConversion.auto_type<'D>(),
+            TypeConversion.auto_type<'E>(),
+            f,
+            TypeConversion.auto_type<'T>()
+        )
+    
 module Command =
 
-    let create desc args impl : Func =
+    let create desc args (impl, argTypes, retType) : Func =
         {
             Desc = desc
-            Binds = args
+            Signature = List.zip args argTypes, retType
             Impl = impl
         }
-
-    let create_anon (arity : int) (impl: _Impl) =
-        create "Anonymous function"
-            (seq {0 .. arity} |> List.ofSeq |> List.map (sprintf "arg%i"))
-            impl
-        |> Val.Func
-
-module FuncTypes =
-
-    open Types
-    
-    let func0 (ret: Type<'T>) : Type<unit -> 'T> =
-        create (sprintf "%s -> %s" "Nil" ret.Name)
-            (function Val.Func f -> (fun () -> ret.Up (f.Impl [])) | x -> unexpected x "Expected a function")
-            (fun (f: unit -> 'T) -> Command.create_anon 0 (Impl.Create(f, ret)))
-
-    let func1 (a1: Type<'A>, ret: Type<'T>) : Type<'A -> 'T> =
-        create (sprintf "%s -> %s" a1.Name ret.Name)
-            (function Val.Func f -> (fun a -> ret.Up (f.Impl [a1.Down a])) | x -> unexpected x "Expected a function")
-            (fun (f: 'A -> 'T) -> Command.create_anon 0 (Impl.Create(a1, f, ret)))
-
-    let func2 (a1: Type<'A>, a2: Type<'B>, ret: Type<'T>) : Type<'A -> 'B -> 'T> =
-        create (sprintf "%s -> %s -> %s" a1.Name a2.Name ret.Name)
-            (function Val.Func f -> (fun a b -> ret.Up (f.Impl [a1.Down a; a2.Down b])) | x -> unexpected x "Expected a function")
-            (fun (f: 'A -> 'B -> 'T) -> Command.create_anon 0 (Impl.Create(a1, a2, f, ret)))
-
-    let func3 (a1: Type<'A>, a2: Type<'B>, a3: Type<'C>, ret: Type<'T>) : Type<'A -> 'B -> 'C -> 'T> =
-        create (sprintf "%s -> %s -> %s" a1.Name a2.Name ret.Name)
-            (function Val.Func f -> (fun a b c -> ret.Up (f.Impl [a1.Down a; a2.Down b; a3.Down c])) | x -> unexpected x "Expected a function")
-            (fun (f: 'A -> 'B -> 'C -> 'T) -> Command.create_anon 0 (Impl.Create(a1, a2, a3, f, ret)))
-
-    let func4 (a1: Type<'A>, a2: Type<'B>, a3: Type<'C>, a4: Type<'D>, ret: Type<'T>) : Type<'A -> 'B -> 'C -> 'D -> 'T> =
-        create (sprintf "%s -> %s -> %s" a1.Name a2.Name ret.Name)
-            (function Val.Func f -> (fun a b c d -> ret.Up (f.Impl [a1.Down a; a2.Down b; a3.Down c; a4.Down d])) | x -> unexpected x "Expected a function")
-            (fun (f: 'A -> 'B -> 'C -> 'D -> 'T) -> Command.create_anon 0 (Impl.Create(a1, a2, a3, a4, f, ret)))
-
-    let func5 (a1: Type<'A>, a2: Type<'B>, a3: Type<'C>, a4: Type<'D>, a5: Type<'E>, ret: Type<'T>) : Type<'A -> 'B -> 'C -> 'D -> 'E -> 'T> =
-        create (sprintf "%s -> %s -> %s" a1.Name a2.Name ret.Name)
-            (function Val.Func f -> (fun a b c d e -> ret.Up (f.Impl [a1.Down a; a2.Down b; a3.Down c; a4.Down d; a5.Down e])) | x -> unexpected x "Expected a function")
-            (fun (f: 'A -> 'B -> 'C -> 'D -> 'E -> 'T) -> Command.create_anon 0 (Impl.Create(a1, a2, a3, a4, a5, f, ret)))

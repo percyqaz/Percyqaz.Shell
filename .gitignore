@@ -3,8 +3,8 @@
 ################################################################################
 
 .vs
-*/bin
-*/obj
+**/bin
+**/obj
 /src/nuget.config
 .vscode/settings.json
 .fake
