@@ -31,6 +31,7 @@ type ShellContext =
 
     member this.WithCommand (name: string, desc: string, args: string list, impl: 'A -> 'B -> 'C -> 'D -> 'E -> 'T) =
         this.WithCommand(name, Command.create desc args (Impl.Create5 impl))
+        
 
 module Shell =
 
@@ -135,36 +136,50 @@ module Shell =
             <|> (pstringCI "help" >>. (spaces >>. opt (identifier (IdentifierOptions()))) |>> ShellRequest.Help)
             <?> "The name of a command or 'help'"
 
+    let dispatch (cmd: ShellRequest) (ctx: ShellContext) =
+        match cmd with
+        | ShellRequest.Command (name, args) ->
+            try
+                let result = ctx.Commands.[name].Impl args
+                if result <> Val.Nil then
+                    ctx.WriteLine (result.ToString())
+            with err ->
+                ctx.WriteLine err.Message
+        | ShellRequest.Help None ->
+            ctx.WriteLine(sprintf "Available commands: %s" (String.concat ", " (ctx.Commands |> Map.keys)))
+        | ShellRequest.Help (Some cmd) ->
+            match ctx.Commands.TryFind cmd with
+            | None -> ctx.WriteLine (sprintf "No such command '%s'" cmd)
+            | Some func ->
+                ctx.WriteLine(sprintf "Showing help for '%s':\n" cmd)
+    
+                ctx.Write("usage: " + cmd)
+                for arg, ty in fst func.Signature do
+                    if ty <> Type.Nil then ctx.Write(sprintf " <%s: %O>" arg ty)
+                let ret = snd func.Signature
+                if ret <> Type.Nil then ctx.Write(sprintf " -> %O" ret)
+                ctx.WriteLine("\n" + func.Desc)
+
     let repl (ctx: ShellContext) =
         let parser = Parser.build ctx
         while true do 
             ctx.Write "> "
             match run parser (ctx.ReadLine().Trim()) with
-            | Success(res, _, _) ->
-                match res with
-                | ShellRequest.Command (name, args) ->
-                    try
-                        let result = ctx.Commands.[name].Impl args
-                        if result <> Val.Nil then
-                            ctx.WriteLine (result.ToString())
-                    with err ->
-                        ctx.WriteLine (err.ToString())
-                | ShellRequest.Help None ->
-                    ctx.WriteLine(sprintf "Available commands: %s" (String.concat ", " (ctx.Commands |> Map.keys)))
-                | ShellRequest.Help (Some cmd) ->
-                    match ctx.Commands.TryFind cmd with
-                    | None -> ctx.WriteLine (sprintf "No such command '%s'" cmd)
-                    | Some func ->
-                        ctx.WriteLine(sprintf "Showing help for '%s':\n" cmd)
-    
-                        ctx.Write("usage: " + cmd)
-                        for arg, ty in fst func.Signature do
-                            if ty <> Type.Nil then ctx.Write(sprintf " <%s: %O>" arg ty)
-                        let ret = snd func.Signature
-                        if ret <> Type.Nil then ctx.Write(sprintf " -> %O" ret)
-                        ctx.WriteLine("\n" + func.Desc)
+            | Success(res, _, _) -> dispatch res ctx
             | Failure(err, _, _) ->
                 let s = err.ToString()
                 let s = s.Substring(s.IndexOf('\n') + 1).Replace("Note: The error occurred at the end of the input stream.\r\n", "")
                 let s = s.Substring(s.IndexOf('\n') + 1).TrimEnd()
                 ctx.WriteLine (sprintf "  %s" s)
+
+    type ShellContext with
+
+        member this.Evaluate(input: string) =
+            let parser = Parser.build this
+            match run parser (input.Trim()) with
+            | Success(res, _, _) -> dispatch res this
+            | Failure(err, _, _) ->
+                let s = err.ToString()
+                let s = s.Substring(s.IndexOf('\n') + 1).Replace("Note: The error occurred at the end of the input stream.\r\n", "")
+                let s = s.Substring(s.IndexOf('\n') + 1).TrimEnd()
+                this.WriteLine (sprintf "  %s" s)
