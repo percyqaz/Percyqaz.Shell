@@ -9,11 +9,12 @@ type IOContext =
     static member Console = { In = Console.In; Out = Console.Out }
 
 type ShellContext =
-    { Commands: Map<string, Func>; IO: IOContext }
+    { Commands: Map<string, Func>; mutable IO: IOContext }
     static member Empty = { Commands = Map.empty; IO = IOContext.Console }
     member this.Write(str: string) = this.IO.Out.Write(str)
     member this.WriteLine(str: string) = this.IO.Out.WriteLine(str)
     member this.ReadLine() = this.IO.In.ReadLine()
+    member this.Copy = { Commands = this.Commands; IO = this.IO }
 
     member this.WithCommand(name: string, func: Func) = { this with Commands = Map.add name func this.Commands }
 
@@ -193,15 +194,18 @@ module Shell =
 
     module IPC =
         
+        /// This modifies the context to use a pipe as IO
         let start_server (name: string) (ctx: ShellContext) (cancellationToken: CancellationToken) =
             task {
                 let server = new NamedPipeServerStream(name, PipeDirection.InOut, 1)
 
                 let reader = new StreamReader(server, Text.Encoding.UTF8)
 
-                let ctx = { ctx with IO = { In = reader; Out = new StreamWriter(server) }}
+                ctx.IO <- { In = reader; Out = new StreamWriter(server) }
                 let parser = Parser.build ctx
                 let BOM = char 65279
+
+                try
 
                 while not cancellationToken.IsCancellationRequested do
                     do! server.WaitForConnectionAsync(cancellationToken)
@@ -220,8 +224,13 @@ module Shell =
                     server.WaitForPipeDrain()
                     server.Disconnect()
 
+                with
+                | :? OperationCanceledException
+                | :? Tasks.TaskCanceledException -> ()
+
             } |> Async.AwaitTask |> Async.RunSynchronously
 
+        /// This modifies the context to use a pipe as IO
         let start_server_thread (name: string) (ctx: ShellContext) =
             let cts = new CancellationTokenSource()
             let thread = new Thread(fun () -> start_server name ctx cts.Token)
