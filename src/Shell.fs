@@ -223,10 +223,10 @@ module Shell =
             } |> Async.AwaitTask |> Async.RunSynchronously
 
         let start_server_thread (name: string) (ctx: ShellContext) =
-            let token = new CancellationToken()
-            let thread = new Thread(fun () -> start_server name ctx token)
+            let cts = new CancellationTokenSource()
+            let thread = new Thread(fun () -> start_server name ctx cts.Token)
             thread.Start()
-            token
+            cts
         
         let send (name: string) (input: string) =
             
