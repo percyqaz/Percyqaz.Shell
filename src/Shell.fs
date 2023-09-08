@@ -186,3 +186,57 @@ module Shell =
                 let s = s.Substring(s.IndexOf('\n') + 1).Replace("Note: The error occurred at the end of the input stream.\r\n", "   ")
                 let s = s.Substring(s.IndexOf('\n') + 1).TrimEnd()
                 this.WriteLine (sprintf "  %s" s)
+
+    open System.IO
+    open System.IO.Pipes
+    open System.Threading
+
+    module IPC =
+        
+        let start_server (name: string) (ctx: ShellContext) (cancellationToken: CancellationToken) =
+            task {
+                let server = new NamedPipeServerStream(name, PipeDirection.InOut, 1)
+
+                let reader = new StreamReader(server, Text.Encoding.UTF8)
+
+                let ctx = { ctx with IO = { In = reader; Out = new StreamWriter(server) }}
+                let parser = Parser.build ctx
+                let BOM = char 65279
+
+                while not cancellationToken.IsCancellationRequested do
+                    do! server.WaitForConnectionAsync(cancellationToken)
+                    let! request = ctx.IO.In.ReadLineAsync()
+
+                    match run parser (request.Trim().Trim(BOM)) with
+                    | Success(res, _, _) -> dispatch res ctx
+                    | Failure(err, _, _) ->
+                        let s = err.ToString()
+                        let s = s.Substring(s.IndexOf('\n') + 1).Replace("Note: The error occurred at the end of the input stream.\r\n", "")
+                        let s = s.Substring(s.IndexOf('\n') + 1).TrimEnd()
+                        ctx.WriteLine (s)
+
+                    ctx.IO.Out.Flush()
+
+                    server.WaitForPipeDrain()
+                    server.Disconnect()
+
+            } |> Async.AwaitTask |> Async.RunSynchronously
+
+        let start_server_thread (name: string) (ctx: ShellContext) =
+            let token = new CancellationToken()
+            let thread = new Thread(fun () -> start_server name ctx token)
+            thread.Start()
+            token
+        
+        let send (name: string) (input: string) =
+            
+            use client = new NamedPipeClientStream(".", name, PipeDirection.InOut)
+            client.Connect()
+            let sw = new StreamWriter(client, Text.Encoding.UTF8, 32767, true)
+            sw.Write(input)
+            sw.Write('\n')
+            sw.Flush()
+            sw.Dispose()
+
+            use sr = new StreamReader(client)
+            sr.ReadToEnd()
