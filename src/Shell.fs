@@ -4,36 +4,40 @@ open System
 open Percyqaz.Shell.Data
 open FParsec
 
-type IOContext =
-    { In: IO.TextReader; Out: IO.TextWriter }
-    static member Console = { In = Console.In; Out = Console.Out }
-
 type ShellContext =
-    { Commands: Map<string, Func>; mutable IO: IOContext }
-    static member Empty = { Commands = Map.empty; IO = IOContext.Console }
-    member this.Write(str: string) = this.IO.Out.Write(str)
-    member this.WriteLine(str: string) = this.IO.Out.WriteLine(str)
-    member this.ReadLine() = this.IO.In.ReadLine()
-    member this.Copy = { Commands = this.Commands; IO = this.IO }
+    { Commands: Map<string, Func> }
+    static member Empty = { Commands = Map.empty }
 
     member this.WithCommand(name: string, func: Func) = { this with Commands = Map.add name func this.Commands }
 
     member this.WithCommand (name: string, desc: string, impl: unit -> 'T) =
         this.WithCommand(name, Command.create desc [""] (Impl.Create1 impl))
 
+    member this.WithIOCommand (name: string, desc: string, impl: IOContext -> 'T) =
+        this.WithCommand(name, Command.create desc [""] (Impl.Create1Io (fun io () -> impl io)))
+
     member this.WithCommand (name: string, desc: string, arg1name, impl: 'A -> 'T) =
         this.WithCommand(name, Command.create desc [arg1name] (Impl.Create1 impl))
 
+    member this.WithIOCommand (name: string, desc: string, arg1name, impl: IOContext -> 'A -> 'T) =
+        this.WithCommand(name, Command.create desc [arg1name] (Impl.Create1Io impl))
+
     member this.WithCommand (name: string, desc: string, arg1name, arg2name, impl: 'A -> 'B -> 'T) =
         this.WithCommand(name, Command.create desc [arg1name; arg2name] (Impl.Create2 impl))
+        
+    member this.WithIOCommand (name: string, desc: string, arg1name, arg2name, impl: IOContext -> 'A -> 'B -> 'T) =
+        this.WithCommand(name, Command.create desc [arg1name; arg2name] (Impl.Create2Io impl))
 
     member this.WithCommand (name: string, desc: string, arg1name, arg2name, arg3name, impl: 'A -> 'B -> 'C -> 'T) =
         this.WithCommand(name, Command.create desc [arg1name; arg2name; arg3name] (Impl.Create3 impl))
+        
+    member this.WithIOCommand (name: string, desc: string, arg1name, arg2name, arg3name, impl: IOContext -> 'A -> 'B -> 'C -> 'T) =
+        this.WithCommand(name, Command.create desc [arg1name; arg2name; arg3name] (Impl.Create3Io impl))
 
     member this.WithCommand (name: string, desc: string, arg1name, arg2name, arg3name, arg4name, impl: 'A -> 'B -> 'C -> 'D -> 'T) =
         this.WithCommand(name, Command.create desc [arg1name; arg2name; arg3name; arg4name] (Impl.Create4 impl))
 
-    member this.WithCommand (name: string, desc: string, arg1name, arg2name, arg3name, arg4name, arg5name, impl: 'A -> 'B -> 'C -> 'D -> 'E -> 'T) =
+    member this.WithIOCommand (name: string, desc: string, arg1name, arg2name, arg3name, arg4name, arg5name, impl: 'A -> 'B -> 'C -> 'D -> 'E -> 'T) =
         this.WithCommand(name, Command.create desc [arg1name; arg2name; arg3name; arg4name; arg5name] (Impl.Create5 impl))
         
 
@@ -140,53 +144,53 @@ module Shell =
             <|> (pstringCI "help" >>. (spaces >>. opt (identifier (IdentifierOptions()))) |>> ShellRequest.Help)
             <?> "The name of a command or 'help'"
 
-    let dispatch (cmd: ShellRequest) (ctx: ShellContext) =
+    let dispatch (cmd: ShellRequest) (ctx: ShellContext) (io: IOContext) =
         match cmd with
         | ShellRequest.Command (name, args) ->
             try
-                let result = ctx.Commands.[name].Impl args
+                let result = ctx.Commands.[name].Impl io args
                 if result <> Val.Nil then
-                    ctx.WriteLine (result.ToString())
+                    io.WriteLine (result.ToString())
             with err ->
-                ctx.WriteLine err.Message
+                io.WriteLine err.Message
         | ShellRequest.Help None ->
-            ctx.WriteLine(sprintf "Available commands: %s" (String.concat ", " (ctx.Commands |> Map.keys)))
+            io.WriteLine(sprintf "Available commands: %s" (String.concat ", " (ctx.Commands |> Map.keys)))
         | ShellRequest.Help (Some cmd) ->
             match ctx.Commands.TryFind cmd with
-            | None -> ctx.WriteLine (sprintf "No such command '%s'" cmd)
+            | None -> io.WriteLine (sprintf "No such command '%s'" cmd)
             | Some func ->
-                ctx.WriteLine(sprintf "Showing help for '%s':\n" cmd)
+                io.WriteLine(sprintf "Showing help for '%s':\n" cmd)
     
-                ctx.Write("usage: " + cmd)
+                io.Write("usage: " + cmd)
                 for arg, ty in fst func.Signature do
-                    if ty <> Type.Nil then ctx.Write(sprintf " <%s: %O>" arg ty)
+                    if ty <> Type.Nil then io.Write(sprintf " <%s: %O>" arg ty)
                 let ret = snd func.Signature
-                if ret <> Type.Nil then ctx.Write(sprintf " -> %O" ret)
-                ctx.WriteLine("\n" + func.Desc)
+                if ret <> Type.Nil then io.Write(sprintf " -> %O" ret)
+                io.WriteLine("\n" + func.Desc)
 
-    let repl (ctx: ShellContext) =
+    let repl (io: IOContext) (ctx: ShellContext) =
         let parser = Parser.build ctx
         while true do 
-            ctx.Write "> "
-            match run parser (ctx.ReadLine().Trim()) with
-            | Success(res, _, _) -> dispatch res ctx
+            io.Write "> "
+            match run parser (io.ReadLine().Trim()) with
+            | Success(res, _, _) -> dispatch res ctx io
             | Failure(err, _, _) ->
                 let s = err.ToString()
                 let s = s.Substring(s.IndexOf('\n') + 1).Replace("Note: The error occurred at the end of the input stream.\r\n", "")
                 let s = s.Substring(s.IndexOf('\n') + 1).TrimEnd()
-                ctx.WriteLine (sprintf "  %s" s)
+                io.WriteLine (sprintf "  %s" s)
 
     type ShellContext with
 
-        member this.Evaluate(input: string) =
+        member this.Evaluate (io: IOContext) (input: string) =
             let parser = Parser.build this
             match run parser (input.Trim()) with
-            | Success(res, _, _) -> dispatch res this
+            | Success(res, _, _) -> dispatch res this io
             | Failure(err, _, _) ->
                 let s = err.ToString()
                 let s = s.Substring(s.IndexOf('\n') + 1).Replace("Note: The error occurred at the end of the input stream.\r\n", "   ")
                 let s = s.Substring(s.IndexOf('\n') + 1).TrimEnd()
-                this.WriteLine (sprintf "  %s" s)
+                io.WriteLine (sprintf "  %s" s)
 
     open System.IO
     open System.IO.Pipes
@@ -201,7 +205,7 @@ module Shell =
 
                 let reader = new StreamReader(server, Text.Encoding.UTF8)
 
-                ctx.IO <- { In = reader; Out = new StreamWriter(server) }
+                let io = { In = reader; Out = new StreamWriter(server) }
                 let parser = Parser.build ctx
                 let BOM = char 65279
 
@@ -209,17 +213,17 @@ module Shell =
 
                 while not cancellationToken.IsCancellationRequested do
                     do! server.WaitForConnectionAsync(cancellationToken)
-                    let! request = ctx.IO.In.ReadLineAsync()
+                    let! request = io.In.ReadLineAsync()
 
                     match run parser (request.Trim().Trim(BOM)) with
-                    | Success(res, _, _) -> dispatch res ctx
+                    | Success(res, _, _) -> dispatch res ctx io
                     | Failure(err, _, _) ->
                         let s = err.ToString()
                         let s = s.Substring(s.IndexOf('\n') + 1).Replace("Note: The error occurred at the end of the input stream.\r\n", "")
                         let s = s.Substring(s.IndexOf('\n') + 1).TrimEnd()
-                        ctx.WriteLine (s)
+                        io.WriteLine (s)
 
-                    ctx.IO.Out.Flush()
+                    io.Out.Flush()
 
                     server.WaitForPipeDrain()
                     server.Disconnect()
@@ -240,12 +244,14 @@ module Shell =
         let send (name: string) (input: string) =
             
             use client = new NamedPipeClientStream(".", name, PipeDirection.InOut)
-            client.Connect()
-            let sw = new StreamWriter(client, Text.Encoding.UTF8, 32767, true)
-            sw.Write(input)
-            sw.Write('\n')
-            sw.Flush()
-            sw.Dispose()
+            try
+                client.Connect(1000)
+                let sw = new StreamWriter(client, Text.Encoding.UTF8, 32767, true)
+                sw.Write(input)
+                sw.Write('\n')
+                sw.Flush()
+                sw.Dispose()
 
-            use sr = new StreamReader(client)
-            sr.ReadToEnd()
+                use sr = new StreamReader(client)
+                sr.ReadToEnd() |> Some
+            with :? TimeoutException -> None

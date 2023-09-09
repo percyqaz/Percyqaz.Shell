@@ -1,6 +1,14 @@
 ﻿namespace Percyqaz.Shell
 
 open System
+open System.IO
+
+type IOContext =
+    { In: TextReader; Out: TextWriter }
+    static member Console = { In = Console.In; Out = Console.Out }
+    member this.Write(str: string) = this.Out.Write(str)
+    member this.WriteLine(str: string) = this.Out.WriteLine(str)
+    member this.ReadLine() = this.In.ReadLine()
 
 module Data =
 
@@ -35,7 +43,7 @@ module Data =
         {
             Desc: string
             Signature: (string * Type) list * Type
-            Impl: Val list -> Val
+            Impl: IOContext -> Val list -> Val
         }
         override this.Equals(other) = false
         override this.GetHashCode() = hash (this.Signature, this.Desc)

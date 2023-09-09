@@ -118,7 +118,7 @@ module TypeConversion =
         | x when x = typeof<Val array> -> arr any |> unbox
         | _t -> failwithf "Automatic type not supported for %O" _t
 
-type private _Impl = (Val list -> Val) * Type list * Type
+type private _Impl = (IOContext -> Val list -> Val) * Type list * Type
 
 type Impl =
     
@@ -128,7 +128,7 @@ type Impl =
         f: 'A -> 'T,
         ret: TypeConversion<'T>
         ) : _Impl =
-        fun xs ->
+        fun io xs ->
             match xs with
             | a :: [] -> f (a1.Up a) |> ret.Down
             | _ -> failwith "Expected 1 argument"
@@ -142,6 +142,25 @@ type Impl =
             TypeConversion.auto_type<'T>()
         )
 
+    static member Create1(
+        a1: TypeConversion<'A>,
+        f: IOContext -> 'A -> 'T,
+        ret: TypeConversion<'T>
+        ) : _Impl =
+        fun io xs ->
+            match xs with
+            | a :: [] -> f io (a1.Up a) |> ret.Down
+            | _ -> failwith "Expected 1 argument"
+        , [a1.Type]
+        , ret.Type
+
+    static member Create1Io(f: IOContext -> 'A -> 'T) : _Impl = 
+        Impl.Create1(
+            TypeConversion.auto_type<'A>(),
+            f,
+            TypeConversion.auto_type<'T>()
+        )
+
     // Arity 2
     static member Create2(
         a1: TypeConversion<'A>,
@@ -149,7 +168,7 @@ type Impl =
         f: 'A -> 'B -> 'T,
         ret: TypeConversion<'T>
         ) : _Impl =
-        fun xs ->
+        fun io xs ->
             match xs with
             | a :: b :: [] -> f (a1.Up a) (a2.Up b) |> ret.Down
             | _ -> failwith "Expected 2 arguments"
@@ -157,6 +176,27 @@ type Impl =
         , ret.Type
 
     static member Create2(f: 'A -> 'B -> 'T) : _Impl = 
+        Impl.Create2(
+            TypeConversion.auto_type<'A>(),
+            TypeConversion.auto_type<'B>(),
+            f,
+            TypeConversion.auto_type<'T>()
+        )
+
+    static member Create2(
+        a1: TypeConversion<'A>,
+        a2: TypeConversion<'B>,
+        f: IOContext -> 'A -> 'B -> 'T,
+        ret: TypeConversion<'T>
+        ) : _Impl =
+        fun io xs ->
+            match xs with
+            | a :: b :: [] -> f io (a1.Up a) (a2.Up b) |> ret.Down
+            | _ -> failwith "Expected 2 arguments"
+        , [a1.Type; a2.Type]
+        , ret.Type
+
+    static member Create2Io(f: IOContext -> 'A -> 'B -> 'T) : _Impl = 
         Impl.Create2(
             TypeConversion.auto_type<'A>(),
             TypeConversion.auto_type<'B>(),
@@ -172,7 +212,7 @@ type Impl =
         f: 'A -> 'B -> 'C -> 'T,
         ret: TypeConversion<'T>
         ) : _Impl =
-        fun xs ->
+        fun io xs ->
             match xs with
             | a :: b :: c :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) |> ret.Down
             | _ -> failwith "Expected 3 arguments"
@@ -180,6 +220,29 @@ type Impl =
         , ret.Type
 
     static member Create3(f: 'A -> 'B -> 'C -> 'T) : _Impl = 
+        Impl.Create3(
+            TypeConversion.auto_type<'A>(),
+            TypeConversion.auto_type<'B>(),
+            TypeConversion.auto_type<'C>(),
+            f,
+            TypeConversion.auto_type<'T>()
+        )
+
+    static member Create3(
+        a1: TypeConversion<'A>,
+        a2: TypeConversion<'B>,
+        a3: TypeConversion<'C>,
+        f: IOContext -> 'A -> 'B -> 'C -> 'T,
+        ret: TypeConversion<'T>
+        ) : _Impl =
+        fun io xs ->
+            match xs with
+            | a :: b :: c :: [] -> f io (a1.Up a) (a2.Up b) (a3.Up c) |> ret.Down
+            | _ -> failwith "Expected 3 arguments"
+        , [a1.Type; a2.Type; a3.Type]
+        , ret.Type
+
+    static member Create3Io(f: IOContext -> 'A -> 'B -> 'C -> 'T) : _Impl = 
         Impl.Create3(
             TypeConversion.auto_type<'A>(),
             TypeConversion.auto_type<'B>(),
@@ -197,7 +260,7 @@ type Impl =
         f: 'A -> 'B -> 'C -> 'D -> 'T,
         ret: TypeConversion<'T>
         ) : _Impl =
-        fun xs ->
+        fun io xs ->
             match xs with
             | a :: b :: c :: d :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) |> ret.Down
             | _ -> failwith "Expected 4 arguments"
@@ -205,6 +268,31 @@ type Impl =
         , ret.Type
     
     static member Create4(f: 'A -> 'B -> 'C -> 'D -> 'T) : _Impl = 
+        Impl.Create4(
+            TypeConversion.auto_type<'A>(),
+            TypeConversion.auto_type<'B>(),
+            TypeConversion.auto_type<'C>(),
+            TypeConversion.auto_type<'D>(),
+            f,
+            TypeConversion.auto_type<'T>()
+        )
+    
+    static member Create4(
+        a1: TypeConversion<'A>,
+        a2: TypeConversion<'B>,
+        a3: TypeConversion<'C>,
+        a4: TypeConversion<'D>,
+        f: IOContext -> 'A -> 'B -> 'C -> 'D -> 'T,
+        ret: TypeConversion<'T>
+        ) : _Impl =
+        fun io xs ->
+            match xs with
+            | a :: b :: c :: d :: [] -> f io (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) |> ret.Down
+            | _ -> failwith "Expected 4 arguments"
+        , [a1.Type; a2.Type; a3.Type; a4.Type]
+        , ret.Type
+    
+    static member Create4Io(f: IOContext -> 'A -> 'B -> 'C -> 'D -> 'T) : _Impl = 
         Impl.Create4(
             TypeConversion.auto_type<'A>(),
             TypeConversion.auto_type<'B>(),
@@ -224,7 +312,7 @@ type Impl =
         f: 'A -> 'B -> 'C -> 'D -> 'E -> 'T,
         ret: TypeConversion<'T>
         ) : _Impl =
-        fun xs ->
+        fun io xs ->
             match xs with
             | a :: b :: c :: d :: e :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) (a5.Up e) |> ret.Down
             | _ -> failwith "Expected 5 arguments"
@@ -232,6 +320,33 @@ type Impl =
         , ret.Type
 
     static member Create5(f: 'A -> 'B -> 'C -> 'D -> 'E -> 'T) : _Impl = 
+        Impl.Create5(
+            TypeConversion.auto_type<'A>(),
+            TypeConversion.auto_type<'B>(),
+            TypeConversion.auto_type<'C>(),
+            TypeConversion.auto_type<'D>(),
+            TypeConversion.auto_type<'E>(),
+            f,
+            TypeConversion.auto_type<'T>()
+        )
+    
+    static member Create5(
+        a1: TypeConversion<'A>,
+        a2: TypeConversion<'B>,
+        a3: TypeConversion<'C>,
+        a4: TypeConversion<'D>,
+        a5: TypeConversion<'E>,
+        f: IOContext -> 'A -> 'B -> 'C -> 'D -> 'E -> 'T,
+        ret: TypeConversion<'T>
+        ) : _Impl =
+        fun io xs ->
+            match xs with
+            | a :: b :: c :: d :: e :: [] -> f io (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) (a5.Up e) |> ret.Down
+            | _ -> failwith "Expected 5 arguments"
+        , [a1.Type; a2.Type; a3.Type; a4.Type; a5.Type]
+        , ret.Type
+
+    static member Create5Io(f: IOContext -> 'A -> 'B -> 'C -> 'D -> 'E -> 'T) : _Impl = 
         Impl.Create5(
             TypeConversion.auto_type<'A>(),
             TypeConversion.auto_type<'B>(),
