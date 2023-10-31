@@ -8,7 +8,7 @@ type ShellContext =
     { Commands: Map<string, Func> }
     static member Empty = { Commands = Map.empty }
 
-    member this.WithCommand(name: string, func: Func) = { this with Commands = Map.add name func this.Commands }
+    member this.WithCommand(name: string, func: Func) = { Commands = Map.add name func this.Commands }
 
     member this.WithCommand (name: string, desc: string, impl: unit -> 'T) =
         this.WithCommand(name, Command.create desc [""] (Impl.Create1 impl))
