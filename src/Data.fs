@@ -4,7 +4,10 @@ open System
 open System.IO
 
 type IOContext =
-    { In: TextReader; Out: TextWriter }
+    {
+        In: TextReader
+        Out: TextWriter
+    }
     static member Console = { In = Console.In; Out = Console.Out }
     member this.Write(str: string) = this.Out.Write(str)
     member this.WriteLine(str: string) = this.Out.WriteLine(str)
@@ -13,7 +16,8 @@ type IOContext =
 module Data =
 
     // types and values. the basis of data shoveling
-    type [<RequireQualifiedAccess>] Type =
+    [<RequireQualifiedAccess>]
+    type Type =
         | Any
         | Number
         | Text
@@ -23,21 +27,34 @@ module Data =
         | Object of Map<string, Type>
         | Array of Type
         | Function of Type list * Type
-        static member Boolean = Atoms ["True", Type.Nil; "False", Type.Nil]
+        static member Boolean = Atoms [ "True", Type.Nil; "False", Type.Nil ]
+
         override this.ToString() =
             match this with
             | Any -> "Any"
             | Number -> "Number"
             | Text -> "Text"
             | Nil -> "Nil"
-            
+
             | Atoms xs ->
-                String.concat " | " (xs |> Seq.map (fun (label, ty) -> "'" + label + if ty <> Type.Nil then "(" + ty.ToString() + ")" else ""))
-            | Object vals -> "{ " + String.concat ", " (vals |> Map.toSeq |> Seq.map (fun (key, ty) -> key + ": " + ty.ToString())) + " }"
+                String.concat
+                    " | "
+                    (xs
+                     |> Seq.map (fun (label, ty) ->
+                         "'" + label + (if ty <> Type.Nil then "(" + ty.ToString() + ")" else "")
+                     ))
+            | Object vals ->
+                "{ "
+                + String.concat ", " (vals |> Map.toSeq |> Seq.map (fun (key, ty) -> key + ": " + ty.ToString()))
+                + " }"
             | Array ty -> "[" + ty.ToString() + "]"
-            | Function (args, ret) -> 
-                if args = [Type.Nil] then "_" else String.concat " -> " (args |> List.map string)
-                + " -> " + ret.ToString()
+            | Function(args, ret) ->
+                if args = [ Type.Nil ] then
+                    "_"
+                else
+                    String.concat " -> " (args |> List.map string)
+                + " -> "
+                + ret.ToString()
 
     and [<CustomEquality; NoComparison>] Func =
         {
@@ -47,7 +64,7 @@ module Data =
         }
         override this.Equals(other) = false
         override this.GetHashCode() = hash (this.Signature, this.Desc)
-    
+
     and [<RequireQualifiedAccess; StructuralEquality; NoComparison>] Val =
         | Text of string
         | Num of float
@@ -63,16 +80,13 @@ module Data =
             | Num n -> sprintf "%O" n
             | Nil -> "Nil"
 
-            | Atom (a, Nil) -> "'" + a
-            | Atom (a, v) -> sprintf "'%s(%O)" a v
-            | Obj ms -> 
-                "{ " + 
-                ( Map.toSeq ms
-                |> Seq.map (fun (prop, v) -> sprintf "%s: %O" prop v)
-                |> String.concat ", " )
+            | Atom(a, Nil) -> "'" + a
+            | Atom(a, v) -> sprintf "'%s(%O)" a v
+            | Obj ms ->
+                "{ "
+                + (Map.toSeq ms
+                   |> Seq.map (fun (prop, v) -> sprintf "%s: %O" prop v)
+                   |> String.concat ", ")
                 + " }"
-            | Arr xs ->
-                "[" + 
-                ( xs |> List.map (sprintf "%O") |> String.concat ", " )
-                + "]"
+            | Arr xs -> "[" + (xs |> List.map (sprintf "%O") |> String.concat ", ") + "]"
             | Fun f -> sprintf "<function of arity %i>" (fst f.Signature).Length
