@@ -4,7 +4,8 @@ open System
 
 module Tree =
 
-    type [<CustomEquality; NoComparison>] Func =
+    [<CustomEquality; NoComparison>]
+    type Func =
         {
             // For documentation/help purposes
             Binds: string list
@@ -14,7 +15,7 @@ module Tree =
         }
         override this.Equals(other) = false
         override this.GetHashCode() = hash (this.Binds, this.Desc)
-    
+
     and [<RequireQualifiedAccess; StructuralEquality; NoComparison>] Val =
         | Str of string
         | Num of float
@@ -31,16 +32,13 @@ module Tree =
             | Bool b -> if b then "True" else "False"
             | Nil -> "Nil"
 
-            | Obj ms -> 
-                "{ " + 
-                ( Map.toSeq ms
-                |> Seq.map (fun (prop, v) -> sprintf "%s: %O" prop v)
-                |> String.concat ", " )
+            | Obj ms ->
+                "{ "
+                + (Map.toSeq ms
+                   |> Seq.map (fun (prop, v) -> sprintf "%s: %O" prop v)
+                   |> String.concat ", ")
                 + " }"
-            | Arr xs ->
-                "[" + 
-                ( xs |> List.map (sprintf "%O") |> String.concat ", " )
-                + "]"
+            | Arr xs -> "[" + (xs |> List.map (sprintf "%O") |> String.concat ", ") + "]"
             | Func f -> sprintf "<function of arity %i>" f.Binds.Length
 
     and [<RequireQualifiedAccess>] Monop =
@@ -72,7 +70,7 @@ module Tree =
             | SUB -> "-"
             | MUL -> "*"
             | DIV -> "/"
-        
+
     and [<RequireQualifiedAccess>] StrFrag =
         | Ex of Expr
         | Str of string
@@ -107,35 +105,37 @@ module Tree =
             match this with
             | Str s -> sprintf "%A" s
             | StrInterp xs ->
-                List.map (function StrFrag.Ex ex -> sprintf "{%O}" ex | StrFrag.Str s -> s) xs
-                |> String.concat "" |> sprintf "%A"
+                List.map
+                    (function
+                    | StrFrag.Ex ex -> sprintf "{%O}" ex
+                    | StrFrag.Str s -> s)
+                    xs
+                |> String.concat ""
+                |> sprintf "%A"
             | Num n -> n.ToString(Globalization.CultureInfo.InvariantCulture)
             | Bool b -> if b then "True" else "False"
             | Nil -> "Nil"
-            | Obj ms -> 
-                "{ " + 
-                ( Map.toSeq ms
-                |> Seq.map (fun (prop, v) -> sprintf "%s: %O" prop v)
-                |> String.concat ", " )
+            | Obj ms ->
+                "{ "
+                + (Map.toSeq ms
+                   |> Seq.map (fun (prop, v) -> sprintf "%s: %O" prop v)
+                   |> String.concat ", ")
                 + " }"
-            | Arr xs ->
-                "[" + 
-                ( xs |> List.map (sprintf "%O") |> String.concat ", " )
-                + "]"
-            | Func (binds, _) -> binds |> String.concat ", " |> sprintf "|%s| -> ..."
+            | Arr xs -> "[" + (xs |> List.map (sprintf "%O") |> String.concat ", ") + "]"
+            | Func(binds, _) -> binds |> String.concat ", " |> sprintf "|%s| -> ..."
 
-            | Monop (op, ex) -> sprintf "%O%O" op ex
-            | Binop (op, left, right) -> sprintf "(%O %O %O)" left op right
+            | Monop(op, ex) -> sprintf "%O%O" op ex
+            | Binop(op, left, right) -> sprintf "(%O %O %O)" left op right
             | Pipevar -> "."
             | Var v -> sprintf "%s" v
-            | ModVar (m, v) -> sprintf "%s:%s" m v
-            | Sub (main, sub) -> sprintf "%O[%O]" main sub
-            | Prop (main, prop) -> sprintf "%O.%s" main prop
-            | Cond (_, basecase) -> sprintf "if ... else %O" basecase
-            
-            | Block (_, ex) -> sprintf "{ ... ; %O }" ex
-            | App (ex, _) -> sprintf "%O ..." ex
-            | Call (ex, _) -> sprintf "%O(...)" ex
+            | ModVar(m, v) -> sprintf "%s:%s" m v
+            | Sub(main, sub) -> sprintf "%O[%O]" main sub
+            | Prop(main, prop) -> sprintf "%O.%s" main prop
+            | Cond(_, basecase) -> sprintf "if ... else %O" basecase
+
+            | Block(_, ex) -> sprintf "{ ... ; %O }" ex
+            | App(ex, _) -> sprintf "%O ..." ex
+            | Call(ex, _) -> sprintf "%O(...)" ex
 
     and [<RequireQualifiedAccess>] Stmt =
         | Decl of string * Expr
@@ -149,18 +149,19 @@ module Tree =
             In: IO.TextReader
             Out: IO.TextWriter
         }
-        static member Default =
-            {
-                In = Console.In
-                Out = Console.Out
-            }
+        static member Default = { In = Console.In; Out = Console.Out }
 
-    and Module = 
-        { 
+    and Module =
+        {
             Vars: Map<string, Val>
         }
         static member Empty = { Vars = Map.empty }
-        member this.WithVar(name: string, value: Val) = { this with Vars = Map.add name value this.Vars }
+
+        member this.WithVar(name: string, value: Val) =
+            { this with
+                Vars = Map.add name value this.Vars
+            }
+
         member this.WithCommand(name: string, func: Func) = this.WithVar(name, Val.Func func)
 
     and Context =
@@ -175,11 +176,20 @@ module Tree =
                 Modules = Map.empty
                 IO = IOContext.Default
             }
+
         member this.Write(str: string) = this.IO.Out.Write(str)
         member this.WriteLine(str: string) = this.IO.Out.WriteLine(str)
         member this.ReadLine() : string = this.IO.In.ReadLine()
-        
-        member this.WithVar(name: string, value: Val) = { this with Vars = Map.add name value this.Vars }
+
+        member this.WithVar(name: string, value: Val) =
+            { this with
+                Vars = Map.add name value this.Vars
+            }
+
         member this.WithPipeVar(value: Val) = this.WithVar("", value)
         member this.WithCommand(name: string, func: Func) = this.WithVar(name, Val.Func func)
-        member this.WithModule(name: string, m: Module) = { this with Modules = Map.add name m this.Modules }
+
+        member this.WithModule(name: string, m: Module) =
+            { this with
+                Modules = Map.add name m this.Modules
+            }

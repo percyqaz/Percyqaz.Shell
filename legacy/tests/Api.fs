@@ -9,11 +9,15 @@ type ``3: Shell Interface``() =
 
     let ctx = Context.Empty.WithVar("x", Val.Num 10)
 
-    let expect_run : ShellResult<Context> -> Context =
+    let expect_run: ShellResult<Context> -> Context =
         function
         | Ok ctx -> ctx
-        | ParseFail err -> Assert.Fail(sprintf "Parse fail: %A" err); failwith ""
-        | RunFail err -> Assert.Fail(sprintf "Runtime fail: %A" err); failwith ""
+        | ParseFail err ->
+            Assert.Fail(sprintf "Parse fail: %A" err)
+            failwith ""
+        | RunFail err ->
+            Assert.Fail(sprintf "Runtime fail: %A" err)
+            failwith ""
 
     let expect theory =
         function
@@ -22,7 +26,7 @@ type ``3: Shell Interface``() =
         | RunFail err -> Assert.Fail(sprintf "Runtime fail: %A" err)
 
     [<Test>]
-    member this.Execute () =
+    member this.Execute() =
 
         ctx
         |> fun ctx -> ctx.Interpret("let y = |x| -> x * x")

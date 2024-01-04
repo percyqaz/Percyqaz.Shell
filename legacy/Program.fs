@@ -46,9 +46,18 @@ let f(c: Cases)
 	  '2 as s -> return String.length s
 	typeof(c) // '3 of Bool"""
 
-let ident = many1Satisfy2 isAsciiLower (isAnyOf "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") |>> Ident
-let atom = skipChar '\'' >>. many1Satisfy (isAnyOf "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") |>> Atom
-let name = many1Satisfy2 isAsciiUpper (isAnyOf "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") |>> Name
+let ident =
+    many1Satisfy2 isAsciiLower (isAnyOf "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+    |>> Ident
+
+let atom =
+    skipChar '\''
+    >>. many1Satisfy (isAnyOf "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+    |>> Atom
+
+let name =
+    many1Satisfy2 isAsciiUpper (isAnyOf "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+    |>> Name
 
 let indentation =
     getUserState
@@ -60,7 +69,9 @@ let indentation =
             let consume_indent = skipChar '\n' >>. skipString got_indent
 
             if got_indent.Length > List.head known_indents then
-                setUserState (got_indent.Length :: known_indents) >>. consume_indent >>. preturn INDENT
+                setUserState (got_indent.Length :: known_indents)
+                >>. consume_indent
+                >>. preturn INDENT
             elif got_indent.Length = List.head known_indents then
                 consume_indent >>. preturn NEWLINE
             elif got_indent.Length > known_indents.[1] then
@@ -70,8 +81,8 @@ let indentation =
             else
                 setUserState (List.tail known_indents) >>. preturn DEDENT
 
-let token = 
-        (skipString "let" >>% LET)
+let token =
+    (skipString "let" >>% LET)
 
     <|> (skipString "=" >>% EQUALS)
     <|> (skipString "+" >>% PLUS)
@@ -94,25 +105,17 @@ let token =
     <|> atom
     <|> ident
     <|> indentation
+
 let spacing = many1Satisfy (fun c -> c = ' ')
 
-runParserOnString (many (token .>> optional spacing)) [0] "Test data" sample
+runParserOnString (many (token .>> optional spacing)) [ 0 ] "Test data" sample
 |> printfn "%A"
 
 open Percyqaz.Shell
 open Percyqaz.Shell.Data
 
 ShellContext.Empty
-    .WithCommand("echo",
-        "Echoes its input back",
-        ["message"],
-        printfn "%s")
-    .WithCommand("sum",
-        "Sums a list of numbers",
-        ["xs"],
-        fun (xs: float list) -> List.sum xs)
-    .WithCommand("not",
-        "Not function",
-        ["flag"],
-        not)
+    .WithCommand("echo", "Echoes its input back", [ "message" ], printfn "%s")
+    .WithCommand("sum", "Sums a list of numbers", [ "xs" ], (fun (xs: float list) -> List.sum xs))
+    .WithCommand("not", "Not function", [ "flag" ], not)
 |> Shell.repl
