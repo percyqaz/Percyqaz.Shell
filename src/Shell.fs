@@ -124,12 +124,11 @@ module Shell =
             string_literal <|> many1Satisfy (isNoneOf " \t\n") |>> Val.Text <?> "Text value"
 
         let parse_number: Parser<Val, unit> =
-            tuple2 (many1Satisfy isDigit) (opt (pchar '.' >>. many1Satisfy isDigit))
+            tuple3 (opt (pchar '-' >>% -1.0) |>> Option.defaultValue 1.0) (many1Satisfy isDigit) (opt (pchar '.' >>. many1Satisfy isDigit))
             |>> function
-                | (pre, Some post) -> pre + "." + post
-                | (pre, None) -> pre
-            |>> System.Double.TryParse
-            |>> fun (s, v) -> Val.Num v
+                | (sign, pre, Some post) -> System.Double.TryParse (pre + "." + post) |> snd |> fun x -> x * sign
+                | (sign, pre, None) -> System.Double.TryParse (pre) |> snd |> fun x -> x * sign
+            |>> Val.Num
             <?> "Number value"
 
         let parse_nil: Parser<Val, unit> = preturn Val.Nil
