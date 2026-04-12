@@ -62,7 +62,7 @@ module Data =
             Signature: (string * Type) list * Type
             Impl: IOContext -> Val list -> Val
         }
-        override this.Equals(other) = false
+        override this.Equals(_: obj) = false
         override this.GetHashCode() = hash (this.Signature, this.Desc)
 
     and [<RequireQualifiedAccess; StructuralEquality; NoComparison>] Val =

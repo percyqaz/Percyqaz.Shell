@@ -118,9 +118,9 @@ type Impl =
 
     // Arity 1
     static member Create1(a1: TypeConversion<'A>, f: 'A -> 'T, ret: TypeConversion<'T>) : _Impl =
-        fun io xs ->
+        fun _ xs ->
             match xs with
-            | a :: [] -> f (a1.Up a) |> ret.Down
+            | [ a ] -> f (a1.Up a) |> ret.Down
             | _ -> failwith "Expected 1 argument"
         , [ a1.Type ]
         , ret.Type
@@ -131,7 +131,7 @@ type Impl =
     static member Create1(a1: TypeConversion<'A>, f: IOContext -> 'A -> 'T, ret: TypeConversion<'T>) : _Impl =
         fun io xs ->
             match xs with
-            | a :: [] -> f io (a1.Up a) |> ret.Down
+            | [ a ] -> f io (a1.Up a) |> ret.Down
             | _ -> failwith "Expected 1 argument"
         , [ a1.Type ]
         , ret.Type
@@ -147,9 +147,9 @@ type Impl =
             f: 'A -> 'B -> 'T,
             ret: TypeConversion<'T>
         ) : _Impl =
-        fun io xs ->
+        fun _ xs ->
             match xs with
-            | a :: b :: [] -> f (a1.Up a) (a2.Up b) |> ret.Down
+            | a :: [ b ] -> f (a1.Up a) (a2.Up b) |> ret.Down
             | _ -> failwith "Expected 2 arguments"
         , [ a1.Type; a2.Type ]
         , ret.Type
@@ -171,7 +171,7 @@ type Impl =
         ) : _Impl =
         fun io xs ->
             match xs with
-            | a :: b :: [] -> f io (a1.Up a) (a2.Up b) |> ret.Down
+            | a :: [ b ] -> f io (a1.Up a) (a2.Up b) |> ret.Down
             | _ -> failwith "Expected 2 arguments"
         , [ a1.Type; a2.Type ]
         , ret.Type
@@ -193,9 +193,9 @@ type Impl =
             f: 'A -> 'B -> 'C -> 'T,
             ret: TypeConversion<'T>
         ) : _Impl =
-        fun io xs ->
+        fun _ xs ->
             match xs with
-            | a :: b :: c :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) |> ret.Down
+            | a :: b :: [ c ] -> f (a1.Up a) (a2.Up b) (a3.Up c) |> ret.Down
             | _ -> failwith "Expected 3 arguments"
         , [ a1.Type; a2.Type; a3.Type ]
         , ret.Type
@@ -219,7 +219,7 @@ type Impl =
         ) : _Impl =
         fun io xs ->
             match xs with
-            | a :: b :: c :: [] -> f io (a1.Up a) (a2.Up b) (a3.Up c) |> ret.Down
+            | a :: b :: [ c ] -> f io (a1.Up a) (a2.Up b) (a3.Up c) |> ret.Down
             | _ -> failwith "Expected 3 arguments"
         , [ a1.Type; a2.Type; a3.Type ]
         , ret.Type
@@ -243,9 +243,9 @@ type Impl =
             f: 'A -> 'B -> 'C -> 'D -> 'T,
             ret: TypeConversion<'T>
         ) : _Impl =
-        fun io xs ->
+        fun _ xs ->
             match xs with
-            | a :: b :: c :: d :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) |> ret.Down
+            | a :: b :: c :: [ d ] -> f (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) |> ret.Down
             | _ -> failwith "Expected 4 arguments"
         , [ a1.Type; a2.Type; a3.Type; a4.Type ]
         , ret.Type
@@ -271,7 +271,7 @@ type Impl =
         ) : _Impl =
         fun io xs ->
             match xs with
-            | a :: b :: c :: d :: [] -> f io (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) |> ret.Down
+            | a :: b :: c :: [ d ] -> f io (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) |> ret.Down
             | _ -> failwith "Expected 4 arguments"
         , [ a1.Type; a2.Type; a3.Type; a4.Type ]
         , ret.Type
@@ -297,9 +297,9 @@ type Impl =
             f: 'A -> 'B -> 'C -> 'D -> 'E -> 'T,
             ret: TypeConversion<'T>
         ) : _Impl =
-        fun io xs ->
+        fun _ xs ->
             match xs with
-            | a :: b :: c :: d :: e :: [] -> f (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) (a5.Up e) |> ret.Down
+            | a :: b :: c :: d :: [ e ] -> f (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) (a5.Up e) |> ret.Down
             | _ -> failwith "Expected 5 arguments"
         , [ a1.Type; a2.Type; a3.Type; a4.Type; a5.Type ]
         , ret.Type
@@ -327,7 +327,7 @@ type Impl =
         ) : _Impl =
         fun io xs ->
             match xs with
-            | a :: b :: c :: d :: e :: [] -> f io (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) (a5.Up e) |> ret.Down
+            | a :: b :: c :: d :: [ e ] -> f io (a1.Up a) (a2.Up b) (a3.Up c) (a4.Up d) (a5.Up e) |> ret.Down
             | _ -> failwith "Expected 5 arguments"
         , [ a1.Type; a2.Type; a3.Type; a4.Type; a5.Type ]
         , ret.Type
@@ -345,7 +345,7 @@ type Impl =
 
 module Command =
 
-    let create desc args (impl, argTypes, retType) : Func =
+    let create (desc: string) (args: string list) (impl: IOContext -> Val list -> Val, argTypes: Type list, retType: Type) : Func =
         {
             Desc = desc
             Signature = List.zip args argTypes, retType

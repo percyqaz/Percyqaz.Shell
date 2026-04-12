@@ -126,8 +126,8 @@ module Shell =
         let parse_number: Parser<Val, unit> =
             tuple3 (opt (pchar '-' >>% -1.0) |>> Option.defaultValue 1.0) (many1Satisfy isDigit) (opt (pchar '.' >>. many1Satisfy isDigit))
             |>> function
-                | (sign, pre, Some post) -> System.Double.TryParse (pre + "." + post) |> snd |> fun x -> x * sign
-                | (sign, pre, None) -> System.Double.TryParse (pre) |> snd |> fun x -> x * sign
+                | sign, pre, Some post -> Double.TryParse (pre + "." + post) |> snd |> fun x -> x * sign
+                | sign, pre, None -> Double.TryParse pre |> snd |> fun x -> x * sign
             |>> Val.Num
             <?> "Number value"
 
@@ -336,7 +336,7 @@ module Shell =
         /// This modifies the context to use a pipe as IO
         let start_server_thread (name: string) (ctx: ShellContext) =
             let cts = new CancellationTokenSource()
-            let thread = new Thread(fun () -> start_server name ctx cts.Token)
+            let thread = Thread(fun () -> start_server name ctx cts.Token)
             thread.Start()
             cts
 
